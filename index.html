@@ -57,6 +57,24 @@
 .mem+.mem{margin-top:6px}
 .mem b{font-weight:600}
 .mem.out{background:none}.mem.out b{color:var(--muted);text-decoration:line-through;font-weight:500}
+/* 상단 고정: body 높이를 화면 높이로 묶으면 sticky 가 한 화면 뒤에 풀려서 auto 로 */
+html,body{height:auto;min-height:100%}
+/* 휴대폰: 상단바는 같이 스크롤되고, 페이지 탭만 한 줄로 맨 위에 고정 */
+@media (max-width:820px){
+  .topbar{position:static}
+  .side{display:contents}
+  .navcard{position:sticky;top:0;z-index:20;padding:5px}
+  .navcard .navlist{display:flex;gap:3px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .navcard .navlist::-webkit-scrollbar{display:none}
+  .navcard .navbtn{flex:1 1 0;width:auto;min-width:0;padding:6px 1px;font-size:10.5px;letter-spacing:-.04em;word-break:keep-all;line-height:1.2}
+}
+/* 출력 고르기 */
+.pp-wrap{position:relative}
+.pp-pan{position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:260px;max-width:min(360px,calc(100vw - 32px));background:var(--surface);border:1px solid var(--line2);border-radius:12px;box-shadow:0 10px 30px rgba(10,11,13,.18);padding:12px}
+.pp-pan label{display:flex;align-items:flex-start;gap:8px;padding:5px 2px;font-size:13px;line-height:1.35;cursor:pointer}
+.pp-pan .pp-act{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.head-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+@media print{.pr-hide{display:none!important}#edpick{display:none!important}}
 .okline{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600}
 .okline i{width:8px;height:8px;border-radius:50%;background:var(--good)}
 .okline.bad i{background:var(--crit)}.okline.bad{color:var(--crit-ink)}
@@ -196,7 +214,6 @@ tr.grp th{background:var(--sunk);color:var(--ink2);font-size:12px}
     <details class="fcard" open>
       <summary>조회 조건 <span id="f-sum"></span></summary>
       <div class="fgrid">
-        <div class="fmode"><span class="fl">선택 방식</span><div class="tg" id="sel-mode"><button data-mode="1">단일 선택</button><button data-mode="n">다중 선택</button></div></div>
         <div class="fs"><span class="fl">연도</span><div class="cg" id="y-chips"></div></div>
         <div class="fs"><span class="fl">분기</span><div class="cg mg" id="q-chips"></div></div>
         <div class="fs"><span class="fl">기준월</span>
@@ -270,7 +287,7 @@ const PAGES = [
 const YEARS=[...new Set(MONTHS.map(m=>m.slice(0,4)))];
 const CAL=YEARS.flatMap(y=>Array.from({length:12},(_,i)=>y+'-'+String(i+1).padStart(2,'0'))); /* 자료가 없어도 1~12월 모두 */
 const HAS=new Set(MONTHS);
-const S = {page:'p1', multi:false, months:new Set(CAL), groups:new Set(), units:new Set(), eds:new Set(), subOnly:false, ed:null, cohorts:COHORTS.slice(-4), nCohort:COHORTS[COHORTS.length-1], nDept:'', bizMonth:BMS[BMS.length-1]};
+const S = {page:'p1', multi:true, months:new Set(CAL), groups:new Set(), units:new Set(), eds:new Set(), subOnly:false, ed:null, cohorts:COHORTS.slice(-4), nCohort:COHORTS[COHORTS.length-1], nDept:'', bizMonth:BMS[BMS.length-1]};
 const selMonths = () => MONTHS.filter(m=>S.months.has(m));
 /* 조회 조건을 적용한 교육 기록(R). 간호단위를 고르면 교육대상자 부서로 걸러지고, 부서라운딩은 부서별 구분이 없어 빠진다 */
 const R = {recs:[], rounds:[], all:[], unitOn:false};
@@ -302,9 +319,6 @@ const sameSet=(a,b)=>a.size===b.size&&[...a].every(x=>b.has(x));
 document.getElementById('y-chips').innerHTML=YEARS.map(y=>`<button class="chip" data-y="${y}">${y}년</button>`).join('');
 document.getElementById('q-chips').innerHTML=QUARTERS.map(q=>{const nd=!qMonths(q).some(m=>HAS.has(m));return `<button class="chip${nd?' nod':''}" data-q="${q}"${nd?' title="자료 없음"':''}>${+q.slice(-1)}분기</button>`;}).join('');
 mc.innerHTML = CAL.map(m=>`<button class="chip${HAS.has(m)?'':' nod'}" data-m="${m}"${HAS.has(m)?'':' title="자료 없음"'}>${ml(m)}</button>`).join('');
-document.getElementById('sel-mode').onclick=e=>{ const b=e.target.closest('[data-mode]'); if(!b||b.disabled) return; S.multi=b.dataset.mode==='n';
-  if(!S.multi){ if(S.groups.size>1) S.groups=new Set([[...S.groups][0]]); if(S.units.size>1) S.units=new Set([[...S.units][0]]); if(S.eds.size>1) S.eds=new Set([[...S.eds][0]]); }
-  render(); };
 /* 기간 칩: 단일 = 누른 것만(다시 누르면 전체), 다중 = 켜고 끄기 */
 function pickPeriod(ms){
   const all=isAll(), on=ms.every(m=>S.months.has(m));
@@ -343,7 +357,6 @@ const UNIT_ITEMS=(()=>{ const present=new Set(roster.map(r=>deptName(r.dept))); 
 document.getElementById('f-reset').onclick = ()=>{ S.months=new Set(CAL); S.groups.clear(); S.units.clear(); S.eds.clear(); S.cohorts=COHORTS.slice(-4); S.ed=null; render(); };
 function syncFilter(page){
   const all=isAll(), ms=selMonths();
-  document.querySelectorAll('#sel-mode [data-mode]').forEach(b=>b.setAttribute('aria-pressed',(b.dataset.mode==='n')===S.multi));
   document.getElementById('m-all').setAttribute('aria-pressed',all);
   mc.querySelectorAll('[data-m]').forEach(b=>b.setAttribute('aria-pressed',!all&&S.months.has(b.dataset.m)));
   document.querySelectorAll('#y-chips [data-y]').forEach(b=>b.setAttribute('aria-pressed',yMonths(b.dataset.y).every(m=>S.months.has(m))));
@@ -351,7 +364,7 @@ function syncFilter(page){
   document.querySelectorAll('#g-chips [data-g]').forEach(b=>b.setAttribute('aria-pressed',S.groups.has(b.dataset.g)));
   multi('u-ms', UNIT_ITEMS, S.units, '전체 부서');
   multi('e-ms', EDS.map(e=>({v:e})), S.eds, '전체 교육간호사');
-  document.querySelectorAll('.fcard .chip, #sel-mode button').forEach(b=>b.disabled=!page.period);
+  document.querySelectorAll('.fcard .chip').forEach(b=>b.disabled=!page.period);
   document.querySelectorAll('.fcard .msb').forEach(b=>b.disabled=!page.period);
   const parts=[];
   parts.push(all?`${YEARS.join('·')}년 전체`:CAL.filter(m=>S.months.has(m)).map(ml).join(', '));
@@ -359,7 +372,7 @@ function syncFilter(page){
   if(S.units.size) parts.push([...S.units].join('·'));
   if(S.eds.size) parts.push('교육간호사 '+(S.eds.size<=2?[...S.eds].join('·'):S.eds.size+'명'));
   document.getElementById('f-sum').textContent = page.period ? parts.join(' · ') : '이 페이지는 적용 안 됨';
-  document.getElementById('f-hint').textContent = page.period ? (S.multi?'다중 선택: 누를 때마다 켜고 꺼져서 여러 분기·월·부서군·부서를 함께 볼 수 있어요. ':'단일 선택: 누른 하나만 보여요(다시 누르면 전체). ')+'점선 칩은 아직 자료가 없는 기간이에요. 간호단위는 교육대상자(신규명단) 부서 기준이고, 부서군과 세부부서를 함께 고르면 둘 중 하나에 해당하면 포함해요.' : '이 페이지는 조회 조건을 쓰지 않고 페이지 안에서 기준월을 고릅니다.';
+  document.getElementById('f-hint').textContent = page.period ? '칩을 누를 때마다 켜고 꺼져서 여러 분기·월·부서군·부서를 함께 볼 수 있어요(다 끄면 전체). '+'점선 칩은 아직 자료가 없는 기간이에요. 간호단위는 교육대상자(신규명단) 부서 기준이고, 부서군과 세부부서를 함께 고르면 둘 중 하나에 해당하면 포함해요.' : '이 페이지는 조회 조건을 쓰지 않고 페이지 안에서 기준월을 고릅니다.';
 }
 
 /* ---------- 말풍선 ---------- */
@@ -462,12 +475,12 @@ function edAgg(ed,ms){
 
 /* ---------- 출력 버튼 ---------- */
 const tools = (title,hint,id) => `<div class="tools"><div><h2>${title}</h2>${hint?`<p class="hint" style="margin:0">${hint}</p>`:''}</div>
-  <div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" data-xlsx="${id}">엑셀 저장</button><button class="btn" data-print>인쇄</button><button class="btn" data-print title="인쇄 창에서 'PDF로 저장'을 고르세요">PDF 저장</button></div></div>`;
+  <div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-print="sec" title="이 구역만 출력해요 · 인쇄 창에서 'PDF로 저장'을 고르면 PDF로 받아요">출력</button><button class="btn pri" data-xlsx="${id}">엑셀 저장</button></div></div>`;
 let xlsxReady=null;
 function loadXLSX(){ if(window.XLSX) return Promise.resolve(); if(!xlsxReady) xlsxReady=new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=ok;s.onerror=()=>no(new Error('엑셀 기능을 불러오지 못했어요. 인터넷 연결을 확인해 주세요.'));document.head.appendChild(s);}); return xlsxReady; }
 document.addEventListener('click', async e=>{
   const x=e.target.closest('[data-xlsx]'), p=e.target.closest('[data-print]');
-  if(p){ window.print(); return; }
+  if(p){ const sec=p.dataset.print==='sec'?(p.closest('[data-sec]')||p.closest('.tools')?.parentElement||p.closest('.card')):null; printOnly(sec?[sec]:null); return; }
   if(!x) return;
   try{ await loadXLSX(); }catch(err){ alert(err.message); return; }
   const page=PAGES.find(q=>q.id===S.page), t=document.getElementById(x.dataset.xlsx);
@@ -477,6 +490,37 @@ document.addEventListener('click', async e=>{
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '자료');
   XLSX.writeFile(wb, `${page.name}_${(cond||'전체').replace(/[\\/:*?"<>|, ]+/g,'')}_.xlsx`);
 });
+/* 출력: targets = 남길 요소 목록(null이면 페이지 전체). 나머지 형제를 잠깐 숨기고 인쇄 */
+function printOnly(targets){
+  const main=document.getElementById('main'), hid=[];
+  document.querySelectorAll('.pr-hide').forEach(s=>s.classList.remove('pr-hide'));
+  if(targets&&targets.length){
+    const keep=new Set(); targets.forEach(el=>{ for(let n=el;n&&n!==main;n=n.parentElement) keep.add(n); });
+    keep.forEach(n=>{ [...n.parentElement.children].forEach(s=>{ if(!keep.has(s)&&!s.classList.contains('phdr')&&!s.classList.contains('head')){ s.classList.add('pr-hide'); hid.push(s); } }); });
+  }
+  const done=()=>{ hid.forEach(s=>s.classList.remove('pr-hide')); window.removeEventListener('afterprint',done); };
+  window.addEventListener('afterprint',done); window.print(); setTimeout(done,1500);
+}
+/* 페이지 상단 출력 버튼: 기본은 전체, 구역을 골라서 출력할 수도 있음 */
+function pageSecs(){ return [...document.querySelectorAll('#main > .kpis, #main > .card, #main > section, #main > .stack > .card, #main .grid2 > .card')].filter(el=>el.offsetParent!==null&&(el.classList.contains('kpis')||el.querySelector('h2'))&&!(el.id==='edd'&&!el.querySelector('.kpis'))); }
+const secName=s=>s.classList.contains('kpis')?'핵심 지표(맨 위 숫자 카드)':s.querySelector('h2').textContent.trim();
+function pagePrint(btn){
+  const wrap=btn.closest('.pp-wrap'); let pan=wrap.querySelector('.pp-pan');
+  if(pan){ pan.remove(); return; }
+  const secs=pageSecs();
+  pan=document.createElement('div'); pan.className='pp-pan no-print';
+  pan.innerHTML=`<div class="fl" style="margin-bottom:6px">출력할 구역</div>
+    <label><input type="checkbox" data-ppall checked><b>페이지 전체</b></label>
+    <div style="max-height:46vh;overflow:auto;margin-left:4px">${secs.map((s,i)=>`<label><input type="checkbox" data-pp="${i}" checked>${esc(secName(s))}</label>`).join('')}</div>
+    <div class="pp-act"><button class="btn" data-ppx>닫기</button><button class="btn pri" data-ppgo>출력</button></div>`;
+  wrap.appendChild(pan);
+  const boxes=[...pan.querySelectorAll('[data-pp]')], all=pan.querySelector('[data-ppall]');
+  all.onchange=()=>boxes.forEach(b=>b.checked=all.checked);
+  boxes.forEach(b=>b.onchange=()=>{ all.checked=boxes.every(x=>x.checked); });
+  pan.querySelector('[data-ppx]').onclick=()=>pan.remove();
+  pan.querySelector('[data-ppgo]').onclick=()=>{ const sel=boxes.filter(b=>b.checked).map(b=>secs[+b.dataset.pp]); if(!sel.length){ alert('출력할 구역을 하나 이상 골라 주세요.'); return; } pan.remove(); printOnly(sel.length===secs.length?null:sel); };
+}
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-pprint]'); if(b){ pagePrint(b); return; } if(!e.target.closest('.pp-wrap')) document.querySelectorAll('.pp-pan').forEach(x=>x.remove()); });
 const phdr = page => `<div class="phdr">${esc(page.name)} · 조회 조건: ${esc(page.period?document.getElementById('f-sum').textContent:'-')} · 데이터 기준 ${esc(D.updated)} · 출력 ${new Date().toLocaleString('ko-KR')}</div>`;
 
 /* ---------- 1. 월별 교육현황 ---------- */
@@ -688,7 +732,7 @@ function p2(main){
   const mrows=Object.values(mm).map(o=>{ const months=new Set(allEdRecs.filter(x=>pk2(x)===o.k&&x[0]<=em).map(x=>x[0])); o.cum=months.size; o.isNew=!prevM||!allEdRecs.some(x=>pk2(x)===o.k&&x[0]===prevM); return o; })
     .sort((p,q)=>STAGES.findIndex(s=>s[0]===p.stg)-STAGES.findIndex(s=>s[0]===q.stg) || (p.rid!=null&&q.rid!=null?kOf(p.rid,em)-kOf(q.rid,em):0) || q.min-p.min);
   box.innerHTML=`<div class="hd-row"><div><h2>${esc(dn(ed))} 개인별 상세</h2><p class="hint">${dp?esc(dp.place)+' · 담당부서 '+esc(dp.list.join(', '))+' ('+ml(dp.m)+' 결재문서)':'담당부서 정보 없음'} · 사업신고 ${esc(bizTxt)} (${ml(bizM)})</p></div>
-    <div style="display:flex;gap:8px;align-items:center">${pick}<button class="btn" id="edclose">닫기</button></div></div>
+    <div class="no-print" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${pick}<button class="btn" data-print="sec" title="개인별 상세만 출력해요 · PDF로 받으려면 인쇄 창에서 'PDF로 저장'">출력</button><button class="btn" id="edclose">닫기</button></div></div>
     <div class="kpis" style="margin-top:10px">
       <div class="kpi"><div class="lab">총 교육시간</div><div class="val num">${fmt(a.tot)}<small>분</small></div><div class="sub">현장교육 ${fmt(a.hy)} · 부서라운딩 ${fmt(a.rn)} (현장 ${hyShare.toFixed(0)}%)</div></div>
       <div class="kpi"><div class="lab">월평균 교육시간</div><div class="val num">${fmt(a.avgMin)}<small>분</small></div><div class="sub">보고서 ${repMs.length}개월 기준</div></div>
@@ -1204,13 +1248,15 @@ function render(){
   applyFilter();
   syncFilter(page);
   const main=document.getElementById('main');
-  main.innerHTML=phdr(page)+`<div class="head"><h1>${esc(page.name)}</h1><p>${esc(page.desc)}</p></div>`+
+  main.innerHTML=phdr(page)+`<div class="head head-row"><div><h1>${esc(page.name)}</h1><p>${esc(page.desc)}</p></div><div class="pp-wrap no-print"><button class="btn" data-pprint title="기본은 페이지 전체 · 구역을 골라 출력할 수도 있어요">🖨 페이지 출력</button></div></div>`+
     (page.period&&R.unitOn?`<div class="callout">간호단위(${esc([...S.groups,...S.units].join(', '))})를 골라 교육대상자 부서로 걸렀어요. 부서라운딩은 부서별로 나뉘지 않아 이 조건에서는 빠지고, 신규명단에 없는 인원('명단 외')도 빠져요.</div>`:'');
   if(page.period&&!selMonths().length){ main.insertAdjacentHTML('beforeend',`<div class="card"><p class="note">선택한 기간(${esc(CAL.filter(m=>S.months.has(m)).map(ml).join(', '))})에는 아직 보고 자료가 없어요. 자료가 있는 기간은 ${esc(ml(MONTHS[0]))}~${esc(ml(MONTHS[MONTHS.length-1]))}입니다.</p></div>`); }
   else ({p1,p2,p3,p4,p5,p6,p7})[S.page](main);
   document.title=page.name+' · 간호교육팀 운영 대시보드';
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);
+/* 휴대폰에서 페이지 탭을 상단바 바로 아래에 붙이기 위한 높이 */
+(()=>{ const tb=document.querySelector('.topbar'); if(!tb) return; const set=()=>document.documentElement.style.setProperty('--tbh',tb.offsetHeight+'px'); set(); if(window.ResizeObserver) new ResizeObserver(set).observe(tb); else addEventListener('resize',set); })();
 route();
 };
 </script>
