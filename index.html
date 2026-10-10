@@ -226,7 +226,7 @@ tr.grp th{background:var(--sunk);color:var(--ink2);font-size:12px}
         <button class="freset" id="f-reset">조회 조건 초기화</button>
       </div>
     </details>
-    <div class="navfoot"><b>자료 출처</b>현장교육간호사 월별 업무보고, 신규간호사 명단, 월별 결재문서, 사업별 신고현황<br>이진호(전담) 보고서는 제외</div>
+    <div class="navfoot"><b>자료 출처</b>현장교육간호사 월별 업무보고, 신규간호사 명단, 월별 결재문서, 사업별 신고현황<br>이진호 교육간호사(전담간호사 교육) 포함</div>
   </aside>
 
   <main class="main" id="main"></main>
@@ -253,14 +253,15 @@ const cohortName = c => `${c.slice(2,4)}년 ${+c.slice(5)}월 발령`;
 const nurseAll = D.recs.filter(x=>x[5]!=null);
 const COHORTS = [...new Set(nurseAll.map(x=>cohortOf(x[5])))].sort();
 /* 부서군(신규간호사 발령 유지관리 시스템 발령현황 기준) */
-const UNIT_GROUPS=[['일반병동',['12A','12B','11B','10A','10B','8A','8B','7B','6A']],['통합병동',['14A','14B','13A','13B','11A','9A','9B','7A']],['중환자',['MICU','SICU','EICU','NICU','MFICU']],['수술회복',['수술실','회복실']],['응급',['응급실']]];
+const PA_DEPTS=[...new Set(roster.filter(r=>r.pa||/^PAM/.test(r.dept)).map(r=>r.dept))].sort((a,b)=>a.localeCompare(b,'ko'));   /* 전담간호사(PAM) 부서 */
+const UNIT_GROUPS=[['일반병동',['12A','12B','11B','10A','10B','8A','8B','7B','6A']],['통합병동',['14A','14B','13A','13B','11A','9A','9B','7A']],['중환자',['MICU','SICU','EICU','NICU','MFICU']],['수술회복',['수술실','회복실']],['응급',['응급실']],['전담간호사',PA_DEPTS]];
 const GROUP_OF={}; UNIT_GROUPS.forEach(([g,us])=>us.forEach(u=>GROUP_OF[u]=g));
-const GROUP_C={'일반병동':'--c-G1','통합병동':'--c-G2','중환자':'--c-G3','수술회복':'--c-G4','응급':'--c-G5','기타':'--c-G6','명단 외':'--c-G0'};
+const GROUP_C={'일반병동':'--c-G1','통합병동':'--c-G2','중환자':'--c-G3','수술회복':'--c-G4','응급':'--c-G5','전담간호사':'--c-G6','기타':'--c-G0','명단 외':'--c-G0'};
 const GROUP_ORDER=UNIT_GROUPS.map(g=>g[0]).concat(['기타','명단 외']);
 const DEPT_ALIAS={'OR':'수술실','ER':'응급실','RCR':'회복실'};
 const deptName=d=>DEPT_ALIAS[d]||d;
-const PLACES=[['일반병동','--c-P1'],['통합병동','--c-P2'],['성인중환자','--c-P3'],['신생아중환자','--c-P4'],['수술실','--c-P5'],['응급실','--c-P6']];
-const placeName=g=>{g=String(g||'');if(/간병|통합/.test(g))return '통합병동';if(/신생아/.test(g))return '신생아중환자';if(/중환자/.test(g))return '성인중환자';if(/수술/.test(g))return '수술실';if(/응급/.test(g))return '응급실';if(/일반/.test(g))return '일반병동';return '기타';};
+const PLACES=[['일반병동','--c-P1'],['통합병동','--c-P2'],['성인중환자','--c-P3'],['신생아중환자','--c-P4'],['수술실','--c-P5'],['응급실','--c-P6'],['전담간호사','--c-G0']];
+const placeName=g=>{g=String(g||'');if(/^전담/.test(g))return '전담간호사';if(/간병|통합/.test(g))return '통합병동';if(/신생아/.test(g))return '신생아중환자';if(/중환자/.test(g))return '성인중환자';if(/수술/.test(g))return '수술실';if(/응급/.test(g))return '응급실';if(/일반/.test(g))return '일반병동';return '기타';};
 const PLACE_OF={}; D.dept.forEach(d=>{PLACE_OF[d[0]+'|'+d[1]]=placeName(d[2]);});
 const placeOf=(m,ed)=>{ if(PLACE_OF[m+'|'+ed]) return PLACE_OF[m+'|'+ed]; const c=D.dept.filter(d=>d[1]===ed).sort((a,b)=>Math.abs(+a[0].slice(5)-+m.slice(5))-Math.abs(+b[0].slice(5)-+m.slice(5)))[0]; return c?placeName(c[2]):'기타'; };
 const deptOf=x=>x[5]!=null?deptName(roster[x[5]].dept):'명단 외';
@@ -609,8 +610,9 @@ function p1(main){
 /* ---------- 2. 교육간호사별 ---------- */
 /* ---------- 2. 교육간호사별 ---------- */
 const ED_NOTE = {'정미진':'부서이동'};       /* 이름 옆 표기 */
-const EXCLUDED_EDS = ['이진호'];            /* 보고서 정리 제외(현장교육간호사 인원에는 포함) */
-const dn = e => e + (ED_NOTE[e] ? `(${ED_NOTE[e]})` : '');
+const EXCLUDED_EDS = [];                    /* 보고서 정리 제외 대상(2026-10-11부터 없음) */
+const ED_TAG = {'이진호':'전담'};           /* 이름 옆 담당 표기 */
+const dn = e => e + (ED_NOTE[e]||ED_TAG[e] ? `(${ED_NOTE[e]||ED_TAG[e]})` : '');
 const pk2 = x => x[5]!=null ? 'r'+x[5] : x[2]+'|'+x[3];
 /* 표시 순서: 배치구분 → 그 달 결재문서 순서, 지금 근무 중인 사람이 먼저 */
 const ED_ORDER = (()=>{ const last={}; D.dept.forEach(d=>{ if(!last[d[1]]||d[0]>last[d[1]][0]) last[d[1]]=d; });
@@ -651,7 +653,7 @@ function p2(main){
   const sum=A.reduce((a,x)=>a+x.tot,0), reps=A.reduce((a,x)=>a+x.reports,0), pmSum=A.reduce((a,x)=>a+x.pm,0);
   const bizM=BMS.includes(lastM)?lastM:BMS[BMS.length-1];
   const jeondam=[...new Set(D.biz.filter(b=>b[0]===bizM&&b[2]==='교육전담'&&b[6]!=='제외').map(b=>b[3]))];
-  const fieldN=new Set(D.rounds.filter(x=>x[0]===lastM).map(x=>x[1])).size + EXCLUDED_EDS.length;
+  const fieldN=[...new Set(D.rounds.filter(x=>x[0]===lastM).map(x=>x[1]))].filter(e=>!jeondam.includes(e)).length + EXCLUDED_EDS.length;
   const allRecs=R.recs.filter(x=>A.some(a=>a.ed===x[1]));
   const uniq=k=>new Set(allRecs.filter(x=>stage(x)===k).map(pk2)).size, uniqMin=k=>allRecs.filter(x=>stage(x)===k).reduce((s,x)=>s+x[4],0);
   const rnSum=A.reduce((a,x)=>a+x.rn,0);
@@ -862,7 +864,7 @@ function p4(main){
   const lm=S.deptMonth, end=lm+'-31';
   const nx=(()=>{ const d=new Date(+lm.slice(0,4), +lm.slice(5), 1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); })();
   const rows=D.dept.filter(d=>d[0]===lm).sort((a,b)=>ED_ORDER.indexOf(a[1])-ED_ORDER.indexOf(b[1]));
-  const alias={OR:['OR','수술실'],ER:['ER','응급실'],RCR:['RCR','회복실']}, uds=u=>alias[u]||[u];
+  const alias={OR:['OR','수술실'],ER:['ER','응급실'],RCR:['RCR','회복실']}, uds=u=>alias[u]||(/^PAM\(전담/.test(u)?PA_DEPTS:[u]);   /* PAM(전담간호사) = 전담간호사 부서 전체 */
   const units=u=>String(u).split(',').map(x=>x.trim()).filter(Boolean);
   const inUnits=(us,dept)=>us.some(u=>uds(u).includes(dept));
   /* 담당부서 신규간호사 Ⅰ(발령 1~6개월, 재직) 인원: 이번 달 / 다음 달 */
