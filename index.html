@@ -286,6 +286,7 @@ const PAGES = [
   {id:'p2', ic:'◉', name:'교육간호사별 교육현황', period:true, desc:'교육간호사별 교육시간·교육대상자 비교입니다. 교육간호사를 고르면 기준 달성, 담당부서 신규간호사 교육 확인 등 개인별 검토 화면이 열려요.'},
   {id:'p3', ic:'▦', name:'현장교육 세부분석(부서별)', period:true, desc:'부서별로 현장교육이 얼마나 제공됐는지 봅니다. 교육대상자의 신규명단 부서 기준이며, 부서이동자처럼 명단에 없는 인원은 \'명단 외\'로 묶어요.'},
   {id:'p4', ic:'⌂', name:'담당부서 관리', period:false, desc:'월별 결재문서 기준 교육간호사 담당부서와 변경 이력입니다.'},
+  {id:'p8', ic:'✎', name:'기타업무 성과', period:true, desc:'월별 업무보고의 기타업무 중 본인이 개발·제작·기획·검수한 성과만 모았습니다. 회의·참석·참관·준비 같은 일상 업무와 휴가는 빠져 있고, 여러 날 적힌 같은 일은 1건(투입 일수)으로 셉니다.'},
   {id:'p5', ic:'✓', name:'사업신고 인력 관리', period:false, desc:'사업별 신고 인원(매월 기준 9명)과 변동 내역입니다. 사업운영기준에 따른 변동 보고 확인용입니다.'},
   {id:'p7', ic:'⚿', name:'간호교육팀 이력', period:false, desc:'간호교육팀 인력 이력(개인정보)입니다. 2차 비밀번호를 넣어야 열리고, 인력 변경 시 간호관리실(재단) 송부용으로 엑셀·PDF로 받을 수 있어요.'},
   {id:'p6', ic:'⇪', name:'업무보고 올리기', period:false, desc:'업무보고 파일을 여기에 올리면 구글 드라이브 지정 폴더에 저장되고, 1시간 안에 구글시트로 자동 정리돼요.'}
@@ -316,7 +317,7 @@ function applyFilter(){
 document.getElementById('asof').textContent = D.updated;
 document.getElementById('reload').onclick = ()=>window.opsReload();
 const nav = document.getElementById('nav');
-const SHORT={p1:'월별',p2:'교육간호사',p3:'부서별',p4:'담당부서',p5:'사업신고',p7:'교육팀이력',p6:'올리기'};
+const SHORT={p1:'월별',p2:'교육간호사',p3:'부서별',p4:'담당부서',p8:'기타업무',p5:'사업신고',p7:'교육팀이력',p6:'올리기'};
 nav.innerHTML = PAGES.map(p=>`<button class="navbtn${DENY.has(p.id)?' lk':''}" data-p="${p.id}"${DENY.has(p.id)?' aria-disabled="true" title="이 계정은 접근이 제한된 페이지예요"':''}><span class="ic">${p.ic}</span><span class="nm-f">${p.name}</span><span class="nm-s">${SHORT[p.id]}</span>${DENY.has(p.id)?'<span class="lkic" aria-hidden="true">🔒</span>':''}</button>`).join('');
 if(innerWidth<=820) document.querySelector('.fcard').removeAttribute('open');
 nav.onclick = e => { const b=e.target.closest('[data-p]'); if(!b) return; if(DENY.has(b.dataset.p)){ alert('이 계정은 이 페이지에 접근할 수 없어요. 필요하면 교육파트장에게 요청하세요.'); return; } location.hash=b.dataset.p; };
@@ -1153,6 +1154,55 @@ function thList(main, snaps, sk, mlist, mlab){
   document.getElementById('thm').onchange=e=>{ TH.month=e.target.value; render(); };
 }
 
+/* ---------- 8. 기타업무 성과 ---------- */
+const ETC_G=[['교육자료 개발','--v1'],['지침서·표준화','--v3'],['평가·모니터링','--v4'],['연구·사업','--v5'],['교육 기획','--v6'],['강의','--v2']];
+function p8(main){
+  const ms=selMonths(), ALL=D.etc||[];
+  if(!ALL.length){ main.insertAdjacentHTML('beforeend','<div class="card"><p class="note">시트 [기타업무 성과] 탭이 아직 비어 있어요. 자동정리가 보고서를 다시 읽은 뒤 새로고침하면 보여요.</p></div>'); return; }
+  const E=ALL.filter(x=>ms.includes(x[0])&&edOk(x[1]));
+  const eds=ED_ORDER.filter(e=>edOk(e)&&(D.rounds.some(r=>r[1]===e&&ms.includes(r[0]))||E.some(x=>x[1]===e)));
+  const G=ETC_G.map(g=>g[0]), cnt=(f)=>E.filter(f).length;
+  const byEd=eds.map(e=>({e, by:Object.fromEntries(G.map(g=>[g,cnt(x=>x[1]===e&&x[2]===g)])), n:cnt(x=>x[1]===e), days:E.filter(x=>x[1]===e).reduce((a,x)=>a+x[6],0)}));
+  const tot=E.length, days=E.reduce((a,x)=>a+x[6],0);
+  const gTot=Object.fromEntries(G.map(g=>[g,cnt(x=>x[2]===g)])), topG=G.slice().sort((a,b)=>gTot[b]-gTot[a])[0];
+  if(S.p8ed&&!eds.includes(S.p8ed)) S.p8ed=null;
+  const pick=e=>{ S.p8ed=e; render(); setTimeout(()=>document.getElementById('p8d').scrollIntoView({behavior:'smooth',block:'start'}),0); };
+  main.insertAdjacentHTML('beforeend',`
+  <div class="kpis">
+    <div class="kpi"><div class="lab">성과 건수</div><div class="val num">${fmt(tot)}<small>건</small></div><div class="sub">조회 기간 · 같은 달 같은 일은 1건</div></div>
+    <div class="kpi"><div class="lab">투입 일수</div><div class="val num">${fmt(days)}<small>일</small></div><div class="sub">성과를 적은 날의 합</div></div>
+    <div class="kpi"><div class="lab">교육간호사 1인 평균</div><div class="val num">${(eds.length?tot/eds.length:0).toLocaleString('ko-KR',{maximumFractionDigits:1})}<small>건</small></div><div class="sub">${eds.length}명 기준</div></div>
+    <div class="kpi"><div class="lab">가장 많은 성과</div><div class="val" style="font-size:20px">${tot?esc(topG):'–'}</div><div class="sub">${tot?fmt(gTot[topG])+'건 · '+Math.round(gTot[topG]/tot*100)+'%':''}</div></div>
+  </div>
+  <section class="card"><h2>교육간호사별 성과</h2><p class="hint">건수 · 성과 구분별로 쌓았어요 · 막대를 누르면 아래 개인별 성과 목록이 열려요</p>
+    ${legend(ETC_G.map(g=>[g[1],g[0]]))}<div class="chart-wrap" id="g8"></div></section>
+  <section class="card">${tools('교육간호사 × 성과 구분','단위 건 · 행을 누르면 개인별 성과 목록','t8')}
+    <div class="tw" style="margin-top:10px"><table id="t8"><thead><tr><th>교육간호사</th>${ETC_G.map(g=>`<th><span class="cdot" style="--cc:var(${g[1]})"></span>${g[0]}</th>`).join('')}<th class="tot">합계(건)</th><th>투입 일수</th></tr></thead>
+      <tbody>${byEd.map(o=>`<tr data-ed="${esc(o.e)}" style="cursor:pointer"><th>${o.e===S.p8ed?`<span class="chg">${esc(dn(o.e))}</span>`:esc(dn(o.e))}</th>${G.map(g=>`<td class="num">${z(o.by[g])}</td>`).join('')}<td class="num tot">${fmt(o.n)}</td><td class="num">${fmt(o.days)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr class="sum"><th>합계</th>${G.map(g=>`<td class="num">${fmt(gTot[g])}</td>`).join('')}<td class="num tot">${fmt(tot)}</td><td class="num">${fmt(days)}</td></tr></tfoot></table></div></section>
+  <section class="card">${tools('교육간호사 × 월 성과 건수','단위 건 · 진할수록 많이','t8m')}
+    <div class="tw" style="margin-top:10px"><table id="t8m" class="eqcol"><thead><tr><th>교육간호사</th>${ms.map(m=>`<th>${ml(m)}</th>`).join('')}<th class="tot">합계</th></tr></thead>
+      <tbody>${(()=>{ const mx=Math.max(1,...byEd.flatMap(o=>ms.map(m=>cnt(x=>x[1]===o.e&&x[0]===m)))); return byEd.map(o=>`<tr><th>${esc(dn(o.e))}</th>${ms.map(m=>{ const v=cnt(x=>x[1]===o.e&&x[0]===m); return `<td class="num" ${v?`style="background:color-mix(in srgb, var(--c-HY) ${Math.round(8+42*v/mx)}%, transparent);${v/mx>.6?'color:#fff;':''}"`:''}>${v||'<span class="zero">·</span>'}</td>`; }).join('')}<td class="num tot">${fmt(o.n)}</td></tr>`).join(''); })()}</tbody>
+      <tfoot><tr class="sum"><th>합계</th>${ms.map(m=>`<td class="num">${fmt(cnt(x=>x[0]===m))}</td>`).join('')}<td class="num tot">${fmt(tot)}</td></tr></tfoot></table></div></section>
+  <section class="card" id="p8d"></section>`);
+  hbar(document.getElementById('g8'), byEd.map(o=>dn(o.e)), ETC_G.map(([g,c])=>({name:g,c,values:byEd.map(o=>o.by[g])})), {rowH:26,L:96,ft:v=>fmt(v)+'건',sel:S.p8ed?dn(S.p8ed):null,click:lb=>{ const o=byEd.find(x=>dn(x.e)===lb); if(o) pick(o.e); },aria:'교육간호사별 기타업무 성과 건수'});
+  document.querySelectorAll('#t8 tbody tr[data-ed]').forEach(tr=>tr.onclick=()=>pick(tr.dataset.ed));
+  /* 개인별 성과 목록 */
+  const box=document.getElementById('p8d');
+  const sel=`<select id="p8pick" aria-label="교육간호사 선택"><option value="">교육간호사 선택</option>${eds.map(e=>`<option value="${esc(e)}" ${e===S.p8ed?'selected':''}>${esc(dn(e))}</option>`).join('')}</select>`;
+  if(!S.p8ed){ box.innerHTML=`<div class="hd-row"><div><h2>개인별 성과 목록</h2><p class="hint">그래프 막대나 표의 이름을 누르거나, 오른쪽에서 교육간호사를 고르면 성과 목록이 열려요.</p></div><div class="no-print">${sel}</div></div>`; }
+  else {
+    const mine=E.filter(x=>x[1]===S.p8ed), per=d=>d?d.slice(5).replace('-','.'):'';
+    const rows=G.filter(g=>mine.some(x=>x[2]===g)).map(g=>{ const L=mine.filter(x=>x[2]===g).sort((a,b)=>(a[4]||a[0]).localeCompare(b[4]||b[0]));
+      return `<tr class="grp"><th colspan="4"><span class="cdot" style="--cc:var(${ETC_G.find(x=>x[0]===g)[1]})"></span>${esc(g)} · ${L.length}건</th></tr>`+L.map(x=>`<tr><td style="text-align:center;white-space:nowrap">${ml(x[0])}</td><td style="text-align:left;white-space:normal">${esc(x[3])}</td><td class="num" style="white-space:nowrap">${x[4]?(x[4]===x[5]?per(x[4]):per(x[4])+'~'+per(x[5])):'–'}</td><td class="num">${x[6]}일</td></tr>`).join(''); }).join('');
+    box.innerHTML=`${tools(`${esc(dn(S.p8ed))} 성과 목록 <span class="note" style="font-weight:500">${mine.length}건 · 투입 ${mine.reduce((a,x)=>a+x[6],0)}일</span>`,'성과 구분별 · 기간은 그 일을 적은 첫날~마지막 날','t8d')}
+      <div class="no-print" style="margin-top:8px">${sel}</div>
+      <div class="tw" style="margin-top:10px"><table id="t8d"><thead><tr><th style="width:70px">기준월</th><th style="text-align:left">내용</th><th style="width:110px">기간</th><th style="width:80px">투입 일수</th></tr></thead><tbody>${rows||'<tr><td colspan="4" class="note">조회 기간에 성과가 없어요</td></tr>'}</tbody></table></div>
+      <p class="note" style="margin:10px 0 0">자동 판정이 틀린 줄은 시트 [기타업무 성과] 탭 '보정' 열에 포함/제외 또는 성과 구분 이름을 적으면 다음 정리 때 반영돼요.</p>`;
+  }
+  const ps=document.getElementById('p8pick'); if(ps) ps.onchange=e=>{ S.p8ed=e.target.value||null; render(); };
+}
+
 /* ---------- 6. 업무보고 올리기 ---------- */
 const UP = { q:[], month:null, list:null, busy:false, seq:0 };
 const MONTH_OPTS = (()=>{ const out=[], d=new Date(); d.setDate(1); d.setMonth(d.getMonth()+1); for(let i=0;i<18;i++){ out.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); d.setMonth(d.getMonth()-1); } return out; })();
@@ -1264,7 +1314,7 @@ function render(){
   const lj=document.getElementById('ljh'); if(lj) lj.onclick=e=>{ const b=e.target.closest('[data-v]'); if(!b) return; S.ljh=b.dataset.v==='1'; render(); };
   if(S.page==='p3') main.insertAdjacentHTML('beforeend','<div class="callout">PAM(전담간호사) 교육내용은 제외되어 있음</div>');
   if(page.period&&!selMonths().length){ main.insertAdjacentHTML('beforeend',`<div class="card"><p class="note">선택한 기간(${esc(CAL.filter(m=>S.months.has(m)).map(ml).join(', '))})에는 아직 보고 자료가 없어요. 자료가 있는 기간은 ${esc(ml(MONTHS[0]))}~${esc(ml(MONTHS[MONTHS.length-1]))}입니다.</p></div>`); }
-  else ({p1,p2,p3,p4,p5,p6,p7})[S.page](main);
+  else ({p1,p2,p3,p4,p5,p6,p7,p8})[S.page](main);
   document.title=page.name+' · 간호교육팀 운영 대시보드';
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);
