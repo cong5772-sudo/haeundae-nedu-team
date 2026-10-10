@@ -86,6 +86,14 @@
 /* 나란히 놓인 카드: 표를 카드 아래쪽에 맞춰 두 표의 줄이 같은 높이에 오도록 */
 .grid2.eq{align-items:stretch}
 .eqcard{display:flex;flex-direction:column}
+.drop{display:grid;place-items:center;gap:4px;min-height:150px;margin-top:6px;padding:18px;border:2px dashed var(--line2);border-radius:14px;background:var(--sunk);text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop.on{border-color:var(--accent);background:var(--accent-soft)}
+.drop b{font-size:15px}.drop span{font-size:13px;color:var(--muted)}
+.drop.off{opacity:.5;cursor:not-allowed}
+.upwarn{font-size:12.5px;color:var(--ink2)}.upwarn::before{content:"! ";color:var(--warn);font-weight:700}
+.uperr{font-size:12.5px;color:var(--crit-ink);font-weight:600}
+#upq th,#upq td:nth-child(2),#upq td:nth-child(3),#upq td:nth-child(4),#upq td:nth-child(6),#upl td.num{white-space:nowrap}
+#upq td:first-child{min-width:240px}
 .cmp3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 @media (max-width:1100px){.cmp3{grid-template-columns:minmax(0,1fr)}}
 .cmpc{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--surface)}
@@ -181,7 +189,8 @@ tr.grp th{background:var(--sunk);color:var(--ink2);font-size:12px}
 
 <script src="config.js"></script>
 <script>
-window.bootApp = function(D, who){
+window.bootApp = function(D, who, opt){
+opt = opt || {};
 'use strict';
 document.getElementById('who').textContent = who || '';
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -223,7 +232,8 @@ const PAGES = [
   {id:'p2', ic:'◉', name:'교육간호사별 교육현황', period:true, desc:'교육간호사별 교육시간·교육대상자 비교입니다. 교육간호사를 고르면 기준 달성, 담당부서 신규간호사 교육 확인 등 개인별 검토 화면이 열려요.'},
   {id:'p3', ic:'▦', name:'현장교육 세부분석', period:true, desc:'신규간호사 발령 차수·발령 개월차·부서별 현장교육 시간입니다.'},
   {id:'p4', ic:'⌂', name:'담당부서 관리', period:false, desc:'월별 결재문서 기준 교육간호사 담당부서와 변경 이력입니다.'},
-  {id:'p5', ic:'✓', name:'사업신고 인력 관리', period:false, desc:'사업별 신고 인원(매월 기준 9명)과 변동 내역입니다. 사업운영기준에 따른 변동 보고 확인용입니다.'}
+  {id:'p5', ic:'✓', name:'사업신고 인력 관리', period:false, desc:'사업별 신고 인원(매월 기준 9명)과 변동 내역입니다. 사업운영기준에 따른 변동 보고 확인용입니다.'},
+  {id:'p6', ic:'⇪', name:'업무보고 올리기', period:false, desc:'업무보고 파일을 여기에 올리면 구글 드라이브 지정 폴더에 저장되고, 1시간 안에 구글시트로 자동 정리돼요.'}
 ];
 
 /* ---------- 상태 ---------- */
@@ -248,7 +258,7 @@ function applyFilter(){
 document.getElementById('asof').textContent = D.updated;
 document.getElementById('reload').onclick = ()=>window.opsReload();
 const nav = document.getElementById('nav');
-const SHORT={p1:'월별',p2:'교육간호사',p3:'세부분석',p4:'담당부서',p5:'사업신고'};
+const SHORT={p1:'월별',p2:'교육간호사',p3:'세부분석',p4:'담당부서',p5:'사업신고',p6:'올리기'};
 nav.innerHTML = PAGES.map(p=>`<button class="navbtn" data-p="${p.id}"><span class="ic">${p.ic}</span><span class="nm-f">${p.name}</span><span class="nm-s">${SHORT[p.id]}</span></button>`).join('');
 if(innerWidth<=820) document.querySelector('.fcard').removeAttribute('open');
 nav.onclick = e => { const b=e.target.closest('[data-p]'); if(b) location.hash=b.dataset.p; };
@@ -817,6 +827,102 @@ function p5(main){
     people.map(p=>`<tr><th>${esc(p)}</th>${BMS.map((mm,i)=>{const v=cellOf(p,mm),pv=i?cellOf(p,BMS[i-1]):v;return `<td style="text-align:center">${v?(i&&v!==pv?`<span class="chg">${v}</span>`:v):(i&&pv?'<span class="out-n">제외</span>':'–')}</td>`;}).join('')}</tr>`).join('')+'</tbody>';
 }
 
+/* ---------- 6. 업무보고 올리기 ---------- */
+const UP = { q:[], month:null, list:null, busy:false, seq:0 };
+const MONTH_OPTS = (()=>{ const out=[], d=new Date(); d.setDate(1); d.setMonth(d.getMonth()+1); for(let i=0;i<18;i++){ out.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); d.setMonth(d.getMonth()-1); } return out; })();
+const DEF_MONTH = MONTH_OPTS[2];   // 지난달 (보고는 다음 달 초에 올라오므로)
+const guessMonth = n => { const m=String(n).match(/(20\d{2})\s*[.\-_년\s]\s*(\d{1,2})\s*[.월)]/) || String(n).match(/(20\d{2})(\d{2})/); if(!m) return null; const mo=+m[2]; return mo>=1&&mo<=12 ? m[1]+'-'+String(mo).padStart(2,'0') : null; };
+const guessEd = n => { const m=String(n).match(/업무\s*보고\s*[_\-\s]\s*([가-힣]{2,4})/) || String(n).match(/_\s*([가-힣]{2,4})\s*[(\s.]/); return m?m[1]:''; };
+const fsz = b => b>=1048576?(b/1048576).toFixed(1)+'MB':Math.max(1,Math.round(b/1024))+'KB';
+function upWarn(it){
+  const w=[];
+  if(it.kind==='report'){
+    if(!/\.(xlsx|xls)$/i.test(it.file.name)) w.push(['bad','엑셀(.xlsx) 파일만 올릴 수 있어요']);
+    if(it.file.name.indexOf('업무')<0) w.push(['warn',"파일명에 '업무'가 없으면 자동정리에서 빠져요"]);
+    if(EXCLUDED_EDS.some(e=>it.file.name.indexOf(e)>=0)) w.push(['warn','이진호 보고서는 정리에서 제외돼요(저장은 돼요)']);
+    if(!it.ed) w.push(['warn','파일명에서 교육간호사 이름을 못 찾았어요(정리는 보고서 안 이름 기준)']);
+  }
+  if(it.file.size>20*1024*1024) w.push(['bad','20MB 이하만 올릴 수 있어요']);
+  return w;
+}
+function p6(main){
+  const can = !!window.opsCall && opt.team;
+  if(!UP.month) UP.month=DEF_MONTH;
+  main.insertAdjacentHTML('beforeend', !window.opsCall
+    ? `<div class="callout">PC 미리보기(사본 데이터)에서는 올릴 수 없어요. 배포된 대시보드에 로그인해서 사용하세요.</div>`
+    : !opt.team ? `<div class="callout">업무보고 올리기는 간호교육팀만 할 수 있어요. 「명단열람 허용」 탭 소속에 간호교육팀이 있어야 해요.</div>` : '');
+  main.insertAdjacentHTML('beforeend',`
+  <div class="grid2 eq">
+    <section class="card"><h2>개인별 업무보고 <span class="note" style="font-weight:500">엑셀</span></h2><p class="hint">교육간호사별 월 업무보고(.xlsx). 드라이브의 「YYYY년 M월」 폴더에 저장되고 자동정리돼요. 폴더가 없으면 새로 만들어요.</p>
+      <label class="drop" data-kind="report"><input type="file" accept=".xlsx,.xls" multiple hidden><b>파일을 여기로 끌어다 놓거나 눌러서 고르세요</b><span>여러 개를 한 번에 올릴 수 있어요</span></label></section>
+    <section class="card"><h2>월별 업무보고 <span class="note" style="font-weight:500">결재문서</span></h2><p class="hint">팀 월별 업무보고 결재문서(.mht 등). 드라이브 업무보고 폴더 맨 위(지금 위치)에 저장돼요.</p>
+      <label class="drop" data-kind="monthly"><input type="file" multiple hidden><b>파일을 여기로 끌어다 놓거나 눌러서 고르세요</b><span>예: 2026년 9월 간호교육팀 현장교육간호사 업무보고.mht</span></label></section>
+  </div>
+  <section class="card" id="upq"></section>
+  <section class="card" id="upl"></section>`);
+  drawQueue(); drawList();
+  main.querySelectorAll('.drop').forEach(z=>{
+    const inp=z.querySelector('input'), kind=z.dataset.kind;
+    const add=files=>{ [...files].forEach(f=>{ UP.q.push({id:++UP.seq,kind,file:f,month:guessMonth(f.name)||UP.month,ed:kind==='report'?guessEd(f.name):'',state:'대기',msg:''}); }); drawQueue(); };
+    inp.onchange=()=>{ add(inp.files); inp.value=''; };
+    z.ondragover=e=>{ e.preventDefault(); z.classList.add('on'); };
+    z.ondragleave=()=>z.classList.remove('on');
+    z.ondrop=e=>{ e.preventDefault(); z.classList.remove('on'); add(e.dataTransfer.files); };
+    if(!can){ z.classList.add('off'); inp.disabled=true; }
+  });
+}
+function drawQueue(){
+  const box=document.getElementById('upq'); if(!box) return;
+  const can=!!window.opsCall && opt.team, waiting=UP.q.filter(it=>it.state==='대기'||it.state==='실패');
+  const ready=waiting.filter(it=>!upWarn(it).some(w=>w[0]==='bad'));   // 올릴 수 없는 파일은 건너뜀
+  box.innerHTML=`<div class="tools"><div><h2>올릴 파일 <span class="note" style="font-weight:500">${UP.q.length}개</span></h2><p class="hint" style="margin:0">기준월은 파일명에서 자동으로 읽었어요. 틀리면 고쳐 주세요. 개인별 업무보고는 기준월 폴더에 저장돼요.</p></div>
+    <div style="display:flex;gap:8px"><button class="btn" id="upclr" ${UP.busy||!UP.q.length?'disabled':''}>목록 비우기</button><button class="btn pri" id="upgo" ${!can||UP.busy||!ready.length?'disabled':''}>${UP.busy?'올리는 중…':'드라이브에 올리기 ('+ready.length+')'}</button></div></div>
+    ${UP.q.length?`<div class="tw tl" style="margin-top:10px"><table><thead><tr><th>파일</th><th>종류</th><th>기준월</th><th>교육간호사</th><th>확인</th><th>상태</th><th></th></tr></thead><tbody>${UP.q.map(it=>{ const w=upWarn(it);
+      return `<tr><td><b>${esc(it.file.name)}</b> <span class="note">${fsz(it.file.size)}</span></td><td>${it.kind==='report'?'개인별':'월별'}</td>
+      <td>${it.kind==='report'&&(it.state==='대기'||it.state==='실패')?`<select data-qm="${it.id}">${MONTH_OPTS.map(m=>`<option value="${m}" ${m===it.month?'selected':''}>${m.slice(0,4)}년 ${+m.slice(5)}월</option>`).join('')}</select>`:(it.kind==='report'?`${it.month.slice(0,4)}년 ${+it.month.slice(5)}월`:'<span class="note">맨 위 폴더</span>')}</td>
+      <td>${esc(it.ed||'–')}</td><td>${w.length?w.map(x=>`<div class="${x[0]==='bad'?'uperr':'upwarn'}">${esc(x[1])}</div>`).join(''):'<span class="okline"><i></i>확인됨</span>'}</td>
+      <td>${it.state==='완료'?`<span class="okline"><i></i>저장됨</span>${it.msg?`<div class="note">${esc(it.msg)}</div>`:''}`:it.state==='실패'?`<div class="uperr">${esc(it.msg)}</div>`:it.state==='올리는 중'?'<span class="note">올리는 중…</span>':'<span class="note">대기</span>'}</td>
+      <td>${it.state!=='올리는 중'&&it.state!=='완료'?`<button class="btn" data-qx="${it.id}" title="목록에서 빼기">✕</button>`:''}</td></tr>`; }).join('')}</tbody></table></div>`:'<p class="note" style="margin:10px 0 0">위 칸에 파일을 넣으면 여기에 목록이 생겨요.</p>'}`;
+  box.querySelectorAll('[data-qm]').forEach(s=>s.onchange=()=>{ const it=UP.q.find(x=>x.id==s.dataset.qm); it.month=s.value; });
+  box.querySelectorAll('[data-qx]').forEach(b=>b.onclick=()=>{ UP.q=UP.q.filter(x=>x.id!=b.dataset.qx); drawQueue(); });
+  const clr=document.getElementById('upclr'); if(clr) clr.onclick=()=>{ UP.q=UP.q.filter(x=>x.state==='올리는 중'); drawQueue(); };
+  const go=document.getElementById('upgo'); if(go) go.onclick=uploadAll;
+}
+const b64 = f => new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||''); r.onerror=()=>rej(new Error('파일을 읽지 못했어요')); r.readAsDataURL(f); });
+async function uploadAll(){
+  if(UP.busy) return; UP.busy=true; drawQueue();
+  const todo=UP.q.filter(it=>(it.state==='대기'||it.state==='실패')&&!upWarn(it).some(w=>w[0]==='bad')); let lastMonth=null;
+  for(const it of todo){
+    it.state='올리는 중'; drawQueue();
+    try{ const r=await window.opsCall({action:'upload',kind:it.kind,month:it.month,name:it.file.name,mime:it.file.type||'application/octet-stream',b64:await b64(it.file)});
+      it.state='완료'; it.msg=`${r.folder}${r.dup?' · 같은 이름 파일이 있어 새 파일로 추가(정리는 최신 파일 기준)':''}`; if(it.kind==='report') lastMonth=it.month; }
+    catch(e){ it.state='실패'; it.msg=e.message||'올리지 못했어요'; }
+    drawQueue();
+  }
+  UP.busy=false; drawQueue();
+  if(lastMonth){ UP.month=lastMonth; } loadList();
+}
+async function loadList(){
+  if(!window.opsCall||!opt.team) return;
+  UP.list={loading:true}; drawList();
+  try{ UP.list=await window.opsCall({action:'uploads',month:UP.month}); }catch(e){ UP.list={error:e.message}; }
+  drawList();
+}
+function drawList(){
+  const box=document.getElementById('upl'); if(!box) return;
+  const L=UP.list, stc=s=>s==='완료'?'<span class="okline"><i></i>정리 완료</span>':s==='오류'?'<span class="okline bad"><i></i>오류</span>':s==='제외'?'<span class="note">정리 제외</span>':s==='삭제됨'?'<span class="note">삭제됨</span>':'<span class="note">정리 대기(1시간 이내)</span>';
+  box.innerHTML=`<div class="hd-row"><div><h2>드라이브 저장 현황</h2><p class="hint" style="margin:0">기준월 폴더에 들어 있는 파일과 구글시트 자동정리 상태예요. 바로 정리하려면 구글시트 메뉴 [현장교육 자동정리] → 새 보고서 지금 정리.</p></div>
+    <div style="display:flex;gap:8px;align-items:center"><select id="upm" aria-label="기준월">${MONTH_OPTS.map(m=>`<option value="${m}" ${m===UP.month?'selected':''}>${m.slice(0,4)}년 ${+m.slice(5)}월</option>`).join('')}</select><button class="btn" id="upref" ${!window.opsCall||!opt.team?'disabled':''}>불러오기</button>
+    <a class="btn" href="https://drive.google.com/drive/folders/1QagyHtQuz6t4K5o2PYGLwuyaNfxlHPfg" target="_blank" rel="noopener">드라이브 열기</a></div></div>
+    ${!L?'<p class="note" style="margin:10px 0 0">기준월을 고르고 [불러오기]를 누르세요.</p>':L.loading?'<p class="note" style="margin:10px 0 0">불러오는 중…</p>':L.error?`<div class="uperr" style="margin-top:10px">${esc(L.error)}</div>`:`
+    <h3 style="margin:14px 0 6px;font-size:14px">개인별 업무보고 · ${esc(L.folder||'폴더 없음')} <span class="note">${L.reports.length}개</span></h3>
+    ${L.reports.length?`<div class="tw tl"><table><thead><tr><th>파일</th><th>교육간호사</th><th>수정</th><th>자동정리</th><th>메모</th></tr></thead><tbody>${L.reports.map(f=>`<tr><td><a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name)}</a></td><td>${esc(f.ed||'–')}</td><td class="num">${esc(f.modified)}</td><td>${stc(f.status)}</td><td class="note" style="white-space:normal">${esc(f.memo)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="note">아직 이 달 폴더에 파일이 없어요.</p>'}
+    <h3 style="margin:14px 0 6px;font-size:14px">월별 업무보고 · 맨 위 폴더 <span class="note">${L.monthly.length}개</span></h3>
+    ${L.monthly.length?`<div class="tw tl"><table><thead><tr><th>파일</th><th>수정</th><th>크기</th></tr></thead><tbody>${L.monthly.map(f=>`<tr><td><a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name)}</a></td><td class="num">${esc(f.modified)}</td><td class="num">${fsz(f.size)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="note">파일명에 이 달(예: 2026년 9월)이 들어간 결재문서가 없어요.</p>'}`}`;
+  const sel=document.getElementById('upm'); if(sel) sel.onchange=()=>{ UP.month=sel.value; loadList(); };
+  const ref=document.getElementById('upref'); if(ref) ref.onclick=loadList;
+}
+
 /* ---------- 라우팅·렌더 ---------- */
 function route(){ const id=(location.hash||'#p1').slice(1); S.page=PAGES.some(p=>p.id===id)?id:'p1'; render(); window.scrollTo({top:0}); }
 function render(){
@@ -829,7 +935,7 @@ function render(){
   main.innerHTML=phdr(page)+`<div class="head"><h1>${esc(page.name)}</h1><p>${esc(page.desc)}</p></div>`+
     (page.period&&R.unitOn?`<div class="callout">간호단위(${esc([...S.groups,...S.units].join(', '))})를 골라 교육대상자 부서로 걸렀어요. 부서라운딩은 부서별로 나뉘지 않아 이 조건에서는 빠지고, 신규명단에 없는 인원('명단 외')도 빠져요.</div>`:'');
   if(page.period&&!selMonths().length){ main.insertAdjacentHTML('beforeend',`<div class="card"><p class="note">선택한 기간(${esc(CAL.filter(m=>S.months.has(m)).map(ml).join(', '))})에는 아직 보고 자료가 없어요. 자료가 있는 기간은 ${esc(ml(MONTHS[0]))}~${esc(ml(MONTHS[MONTHS.length-1]))}입니다.</p></div>`); }
-  else ({p1,p2,p3,p4,p5})[S.page](main);
+  else ({p1,p2,p3,p4,p5,p6})[S.page](main);
   document.title=page.name+' · 간호교육팀 운영 대시보드';
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);
@@ -861,7 +967,7 @@ async function load(cred, fresh){
   const j = await call(Object.assign({action:'data',fresh:!!fresh},cred));
   $('login').hidden=true; $('loading').hidden=true; document.body.classList.remove('locked');
   if (booted){ location.reload(); return; }
-  booted = true; window.bootApp(j.data, j.who);
+  booted = true; window.opsCall = b => call(Object.assign({}, b, cred())); window.bootApp(j.data, j.who, {team: !!j.team});
 }
 function cred(){ const t=store.get('ops_token'), g=store.get('ops_id'); return t?{token:t}:g?{idToken:g}:null; }
 window.opsReload = async ()=>{ const c=cred(); if(!c){ location.reload(); return; } try{ $('loading').hidden=false; const j=await call(Object.assign({action:'data',fresh:true},c)); store.set('ops_cache_ok','1'); location.reload(); }catch(e){ $('loading').hidden=true; alert(e.message); } };
