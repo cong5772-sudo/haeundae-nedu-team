@@ -86,6 +86,12 @@
 /* 나란히 놓인 카드: 표를 카드 아래쪽에 맞춰 두 표의 줄이 같은 높이에 오도록 */
 .grid2.eq{align-items:stretch}
 .eqcard{display:flex;flex-direction:column}
+.lockcard{max-width:520px;margin:30px auto;text-align:center}.lockcard .lk{font-size:40px;line-height:1;margin-bottom:6px}
+.lkf{display:flex;gap:8px;justify-content:center;margin-top:12px}.lkf input{height:40px;width:220px;border:1px solid var(--line2);border-radius:10px;padding:0 12px;font:inherit;font-size:15px;background:var(--surface);color:var(--ink)}
+table.thist td{white-space:pre-line;text-align:left;vertical-align:top;line-height:1.55}
+table.thist td:nth-child(2){font-weight:700;color:var(--navy)}
+table.thist td{min-width:80px}table.thist td:nth-child(2){white-space:nowrap}table.thist td:nth-child(8){min-width:180px}table.thist td:nth-child(9){min-width:190px}table.thist td:nth-child(10){min-width:100px}table.thist td:nth-child(11){min-width:190px}
+table.thist thead th{text-align:center;white-space:normal}
 .dupwarn{padding:12px 14px;border-radius:var(--r);border:1px solid color-mix(in srgb,var(--crit) 35%,transparent);border-left:4px solid var(--crit);background:color-mix(in srgb,var(--crit) 7%,transparent);font-size:13.5px;color:var(--crit-ink)}
 .bform{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 14px;margin-top:12px}
 .bform label{display:grid;gap:5px;font-size:12.5px;font-weight:600;color:var(--ink2)}
@@ -251,6 +257,7 @@ const PAGES = [
   {id:'p3', ic:'▦', name:'현장교육 세부분석', period:true, desc:'신규간호사 발령 차수·발령 개월차·부서별 현장교육 시간입니다.'},
   {id:'p4', ic:'⌂', name:'담당부서 관리', period:false, desc:'월별 결재문서 기준 교육간호사 담당부서와 변경 이력입니다.'},
   {id:'p5', ic:'✓', name:'사업신고 인력 관리', period:false, desc:'사업별 신고 인원(매월 기준 9명)과 변동 내역입니다. 사업운영기준에 따른 변동 보고 확인용입니다.'},
+  {id:'p7', ic:'⚿', name:'간호교육팀 이력', period:false, desc:'간호교육팀 인력 이력(개인정보)입니다. 2차 비밀번호를 넣어야 열리고, 인력 변경 시 간호관리실(재단) 송부용으로 엑셀·PDF로 받을 수 있어요.'},
   {id:'p6', ic:'⇪', name:'업무보고 올리기', period:false, desc:'업무보고 파일을 여기에 올리면 구글 드라이브 지정 폴더에 저장되고, 1시간 안에 구글시트로 자동 정리돼요.'}
 ];
 
@@ -276,7 +283,7 @@ function applyFilter(){
 document.getElementById('asof').textContent = D.updated;
 document.getElementById('reload').onclick = ()=>window.opsReload();
 const nav = document.getElementById('nav');
-const SHORT={p1:'월별',p2:'교육간호사',p3:'세부분석',p4:'담당부서',p5:'사업신고',p6:'올리기'};
+const SHORT={p1:'월별',p2:'교육간호사',p3:'세부분석',p4:'담당부서',p5:'사업신고',p7:'교육팀이력',p6:'올리기'};
 nav.innerHTML = PAGES.map(p=>`<button class="navbtn" data-p="${p.id}"><span class="ic">${p.ic}</span><span class="nm-f">${p.name}</span><span class="nm-s">${SHORT[p.id]}</span></button>`).join('');
 if(innerWidth<=820) document.querySelector('.fcard').removeAttribute('open');
 nav.onclick = e => { const b=e.target.closest('[data-p]'); if(b) location.hash=b.dataset.p; };
@@ -973,6 +980,36 @@ function p5(main){
     people.map(p=>`<tr><th>${esc(p)}</th>${BMS.map((mm,i)=>{const v=cellOf(p,mm),pv=i?cellOf(p,BMS[i-1]):v;const rr=D.biz.filter(x=>x[3]===p&&x[0]===mm&&x[6]==='신고'), dup=rr.length>1, bg=rr.length===1?`background:color-mix(in srgb,var(${BIZ_C[rr[0][1]]}) 16%,transparent);`:'';return `<td style="text-align:center;${bg}">${v?(dup?`<span class="st rsg" title="중복 신고">${v}</span>`:i&&v!==pv?`<span class="chg">${v}</span>`:v):(i&&pv?'<span class="out-n">제외</span>':'–')}</td>`;}).join('')}</tr>`).join('')+'</tbody>';
 }
 
+/* ---------- 7. 간호교육팀 이력 (2차 잠금) ---------- */
+const TH={data:null, err:'', busy:false, at:0};
+function p7(main){
+  const can=!!window.opsCall&&opt.team;
+  if(TH.data&&Date.now()-TH.at>10*60*1000) TH.data=null;   // 10분 지나면 다시 잠금
+  if(!TH.data){
+    main.insertAdjacentHTML('beforeend',`<section class="card lockcard"><div class="lk">🔒</div><h2 style="justify-content:center">간호교육팀 이력 · 2차 잠금</h2>
+      <p class="hint" style="text-align:center">개인정보(경력·학력 등)가 들어 있어 별도 비밀번호를 한 번 더 확인해요. 페이지를 벗어나거나 10분이 지나면 다시 잠겨요.</p>
+      ${can?`<form id="thf" class="lkf"><input id="thpin" type="password" inputmode="numeric" autocomplete="off" placeholder="2차 비밀번호" ${TH.busy?'disabled':''}><button class="btn pri" ${TH.busy?'disabled':''}>${TH.busy?'확인 중…':'열기'}</button></form>${TH.err?`<p class="uperr" style="text-align:center;margin-top:8px">${esc(TH.err)}</p>`:''}`
+        :`<div class="callout">${window.opsCall?'간호교육팀 계정만 볼 수 있어요.':'PC 미리보기에서는 볼 수 없어요. 배포된 대시보드에 로그인해서 사용하세요.'}</div>`}</section>`);
+    const f=document.getElementById('thf'); if(f){ document.getElementById('thpin').focus(); f.onsubmit=async e=>{ e.preventDefault(); const pin=document.getElementById('thpin').value.trim(); if(!pin) return;
+      TH.busy=true; TH.err=''; render();
+      try{ const r=await window.opsCall({action:'teamHist',pin}); TH.data=r; TH.at=Date.now(); }catch(err){ TH.err=err.message; }
+      TH.busy=false; render(); }; }
+    return;
+  }
+  const H=TH.data.headers, rows=TH.data.rows, today=new Date(), ymd=`${today.getFullYear()}.${String(today.getMonth()+1).padStart(2,'0')}.${String(today.getDate()).padStart(2,'0')}`;
+  const fd=v=>String(v).replace(/(^|\n)(\d{4})(\d{2})(\d{2})(?=\n|$)/g,(m,a,y,mo,d)=>`${a}${y}.${mo}.${d}`);
+  const exp=H.map((h,i)=>/^경력/.test(h)?i:-1).filter(i=>i>=0), base=H.map((h,i)=>i).filter(i=>!exp.includes(i));
+  const sub=i=>H[i].replace(/^경력\(?/,'').replace(/\)$/,'')||'경력';
+  main.insertAdjacentHTML('beforeend',`
+  <section class="card">${tools(`간호교육팀 이력 <span class="note" style="font-weight:500">${ymd} 기준 · ${rows.length}명</span>`,'간호관리실(재단) 송부용 · 시트 「간호교육팀 이력」 탭에서 고치면 여기에 반영돼요','th1')}
+    <div class="tw" style="margin-top:10px;max-height:none"><table id="th1" class="thist"><thead>
+      <tr>${base.map(i=>`<th rowspan="${exp.length?2:1}">${esc(H[i]).replace(/\n/g,'<br>')}</th>`).join('')}${exp.length?`<th colspan="${exp.length}" style="text-align:center">경력</th>`:''}</tr>
+      ${exp.length?`<tr>${exp.map(i=>`<th>${esc(sub(i))}</th>`).join('')}</tr>`:''}</thead>
+      <tbody>${rows.map(r=>`<tr>${base.map(i=>`<td>${esc(fd(r[i]))}</td>`).join('')}${exp.map(i=>`<td>${esc(r[i])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:8px;flex-wrap:wrap"><p class="note" style="margin:0">열람 기록이 남아요. 내려받은 파일은 개인정보이니 송부 후 보관에 주의해 주세요.</p><button class="btn" id="thlock">🔒 다시 잠그기</button></div></section>`);
+  document.getElementById('thlock').onclick=()=>{ TH.data=null; render(); };
+}
+
 /* ---------- 6. 업무보고 올리기 ---------- */
 const UP = { q:[], month:null, list:null, busy:false, seq:0 };
 const MONTH_OPTS = (()=>{ const out=[], d=new Date(); d.setDate(1); d.setMonth(d.getMonth()+1); for(let i=0;i<18;i++){ out.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); d.setMonth(d.getMonth()-1); } return out; })();
@@ -1073,6 +1110,7 @@ function drawList(){
 function route(){ const id=(location.hash||'#p1').slice(1); S.page=PAGES.some(p=>p.id===id)?id:'p1'; render(); window.scrollTo({top:0}); }
 function render(){
   charts.length=0;
+  if(S.page!=='p7') TH.data=null;   // 교육팀 이력은 페이지를 떠나면 다시 잠금
   const page=PAGES.find(p=>p.id===S.page);
   nav.querySelectorAll('.navbtn').forEach(b=>{ if(b.dataset.p===S.page) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
   applyFilter();
@@ -1081,7 +1119,7 @@ function render(){
   main.innerHTML=phdr(page)+`<div class="head"><h1>${esc(page.name)}</h1><p>${esc(page.desc)}</p></div>`+
     (page.period&&R.unitOn?`<div class="callout">간호단위(${esc([...S.groups,...S.units].join(', '))})를 골라 교육대상자 부서로 걸렀어요. 부서라운딩은 부서별로 나뉘지 않아 이 조건에서는 빠지고, 신규명단에 없는 인원('명단 외')도 빠져요.</div>`:'');
   if(page.period&&!selMonths().length){ main.insertAdjacentHTML('beforeend',`<div class="card"><p class="note">선택한 기간(${esc(CAL.filter(m=>S.months.has(m)).map(ml).join(', '))})에는 아직 보고 자료가 없어요. 자료가 있는 기간은 ${esc(ml(MONTHS[0]))}~${esc(ml(MONTHS[MONTHS.length-1]))}입니다.</p></div>`); }
-  else ({p1,p2,p3,p4,p5,p6})[S.page](main);
+  else ({p1,p2,p3,p4,p5,p6,p7})[S.page](main);
   document.title=page.name+' · 간호교육팀 운영 대시보드';
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);
