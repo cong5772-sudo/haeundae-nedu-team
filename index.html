@@ -15,6 +15,7 @@
   --c-NEW:var(--c-REG);  /* 신규간호사 */
   --c-MV:var(--c-SEN);   /* 부서이동자 */
   --c-ETC:var(--c-DED);  /* 기타 간호사 */
+  --c-N1:var(--c-REG);--c-N2:var(--c-EMG);--c-RN:var(--c-DED); /* 신규간호사 Ⅰ(1~6개월)·Ⅱ(7~12개월)·간호사 */
   --c-K1:var(--c-REG);--c-K2:var(--c-SEN);--c-K3:var(--c-DED);--c-K4:var(--c-MOV); /* 발령 차수 비교 */
   --c-B1:var(--c-DED);--c-B2:var(--c-REG);--c-B3:var(--c-PTL); /* 사업 */
 }
@@ -165,30 +166,32 @@ document.addEventListener('pointermove', e => { if(!tip.hidden){ tip.style.left=
 document.addEventListener('pointerdown', e => { const t=e.target.closest('[data-tip]'); if(t){ tip.textContent=t.dataset.tip; tip.hidden=false; tip.style.left=Math.min(innerWidth-270,e.clientX+12)+'px'; tip.style.top=(e.clientY+14)+'px'; } });
 
 /* ---------- SVG 그래프 (화면 폭에 맞춰 viewBox 계산) ---------- */
+const axis = v => { v=Math.max(v,1); const raw=v/4, p=Math.pow(10,Math.floor(Math.log10(raw))), n=raw/p; const st=(n<=1?1:n<=2?2:n<=5?5:10)*p; const max=Math.ceil(v/st-1e-9)*st; return {max,st,n:Math.round(max/st)}; };
 const niceMax = v => { if(v<=0) return 1; const p=Math.pow(10,Math.floor(Math.log10(v))); const n=v/p; return (n<=1?1:n<=2?2:n<=2.5?2.5:n<=5?5:10)*p; };
 const charts = [];
 function vbar(el, labels, series, o){
   charts.push(()=>vbar(el,labels,series,o));
-  const W=Math.max(280,el.clientWidth), H=o.h||240, L=44, R=8, T=22, B=26;
+  const W=Math.max(280,el.clientWidth), H=o.h||240, L=o.L||52, R=o.avg!=null?64:8, T=22, B=26;
   const tot=labels.map((_,i)=>series.reduce((a,s)=>a+(s.values[i]||0),0));
-  const max=niceMax(Math.max(...tot)), y=v=>T+(H-T-B)*(1-v/max), step=(W-L-R)/labels.length, bw=Math.min(46,step*.56);
+  const ax=axis(Math.max(...tot,o.avg||0)), max=ax.max, y=v=>T+(H-T-B)*(1-v/max), step=(W-L-R)/labels.length, bw=Math.min(46,step*.56);
   let g='';
-  for(let i=0;i<=4;i++){ const v=max*i/4, yy=y(v); g+=`<line class="grid" x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}"/><text x="${L-6}" y="${yy+4}" text-anchor="end">${o.fy?o.fy(v):fmt(v)}</text>`; }
+  for(let i=0;i<=ax.n;i++){ const v=ax.st*i, yy=y(v); g+=`<line class="grid" x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}"/><text x="${L-6}" y="${yy+4}" text-anchor="end">${o.fy?o.fy(v):fmt(v)}</text>`; }
   labels.forEach((lb,i)=>{ const x=L+step*i+(step-bw)/2; let acc=0;
     series.forEach((s,si)=>{ const v=s.values[i]||0; if(!v) return; const y0=y(acc), y1=y(acc+v); acc+=v; const top=si===series.length-1||!series.slice(si+1).some(t=>t.values[i]);
       g+= top ? `<path class="bar" d="M${x},${y0} V${y1+2} q0,-2 2,-2 H${x+bw-2} q2,0 2,2 V${y0} Z" fill="var(${s.c})" data-tip="${esc(lb)} · ${esc(s.name)}: ${o.ft?o.ft(v):fmt(v)}"/>`
              : `<rect class="bar" x="${x}" y="${y1}" width="${bw}" height="${Math.max(0,y0-y1-1)}" fill="var(${s.c})" data-tip="${esc(lb)} · ${esc(s.name)}: ${o.ft?o.ft(v):fmt(v)}"/>`; });
     if(o.total!==false) g+=`<text class="tot" x="${x+bw/2}" y="${y(tot[i])-6}" text-anchor="middle">${o.ft?o.ft(tot[i]).replace(/[^\d.,]/g,''):fmt(tot[i])}</text>`;
     g+=`<text x="${x+bw/2}" y="${H-8}" text-anchor="middle">${esc(lb)}</text>`; });
+  if(o.avg!=null){ const ya=y(o.avg); g+=`<line class="avg" x1="${L}" x2="${W-R+4}" y1="${ya}" y2="${ya}"/><text x="${W-R+8}" y="${ya-2}" style="fill:var(--muted)">평균</text><text x="${W-R+8}" y="${ya+11}" style="fill:var(--muted)">${o.ft?o.ft(o.avg):fmt(o.avg)}</text>`; }
   el.innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(o.aria||'')}">${g}</svg>`;
 }
 function hbar(el, labels, series, o){
   charts.push(()=>hbar(el,labels,series,o));
   const W=Math.max(280,el.clientWidth), rowH=o.rowH||26, T=6, B=22, L=o.L||64, R=48, H=T+B+rowH*labels.length;
   const tot=labels.map((_,i)=>series.reduce((a,s)=>a+(s.values[i]||0),0));
-  const max=niceMax(Math.max(...tot)), x=v=>L+(W-L-R)*v/max, bh=Math.min(16,rowH*.62);
+  const ax=axis(Math.max(...tot)), max=ax.max, x=v=>L+(W-L-R)*v/max, bh=Math.min(16,rowH*.62);
   let g='';
-  for(let i=0;i<=4;i++){ const v=max*i/4, xx=x(v); g+=`<line class="grid" x1="${xx}" x2="${xx}" y1="${T}" y2="${H-B}"/><text x="${xx}" y="${H-6}" text-anchor="middle">${o.fx?o.fx(v):fmt(v)}</text>`; }
+  for(let i=0;i<=ax.n;i++){ const v=ax.st*i, xx=x(v); g+=`<line class="grid" x1="${xx}" x2="${xx}" y1="${T}" y2="${H-B}"/><text x="${xx}" y="${H-6}" text-anchor="middle">${o.fx?o.fx(v):fmt(v)}</text>`; }
   labels.forEach((lb,i)=>{ const yy=T+rowH*i+(rowH-bh)/2; let acc=0;
     series.forEach((s,si)=>{ const v=s.values[i]||0; if(!v) return; const x0=x(acc), x1=x(acc+v); acc+=v; const end=!series.slice(si+1).some(t=>t.values[i]);
       g+= end ? `<path class="bar" d="M${x0},${yy} H${x1-2} q2,0 2,2 V${yy+bh-2} q0,2 -2,2 H${x0} Z" fill="var(${s.c})" data-tip="${esc(lb)} · ${esc(s.name)}: ${o.ft?o.ft(v):fmt(v)}" ${o.click?`data-key="${esc(lb)}"`:''}/>`
@@ -200,10 +203,10 @@ function hbar(el, labels, series, o){
 function line(el, labels, series, o){
   charts.push(()=>line(el,labels,series,o));
   const W=Math.max(280,el.clientWidth), H=o.h||250, L=48, R=12, T=14, B=30;
-  const vals=series.flatMap(s=>s.values.filter(v=>v!=null)); const max=niceMax(Math.max(1,...vals));
+  const vals=series.flatMap(s=>s.values.filter(v=>v!=null)); const ax=axis(Math.max(1,...vals)), max=ax.max;
   const step=(W-L-R)/Math.max(1,labels.length-1), x=i=>L+step*i, y=v=>T+(H-T-B)*(1-v/max);
   let g='';
-  for(let i=0;i<=4;i++){ const v=max*i/4, yy=y(v); g+=`<line class="grid" x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}"/><text x="${L-6}" y="${yy+4}" text-anchor="end">${fmt(v)}</text>`; }
+  for(let i=0;i<=ax.n;i++){ const v=ax.st*i, yy=y(v); g+=`<line class="grid" x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}"/><text x="${L-6}" y="${yy+4}" text-anchor="end">${fmt(v)}</text>`; }
   labels.forEach((lb,i)=>{ g+=`<text x="${x(i)}" y="${H-10}" text-anchor="middle">${esc(lb)}</text>`; });
   series.forEach(s=>{ let d='', pen=false; s.values.forEach((v,i)=>{ if(v==null){pen=false;return;} d+=(pen?'L':'M')+x(i)+','+y(v)+' '; pen=true; });
     g+=`<path class="ln" d="${d}" stroke="var(${s.c})"/>`;
@@ -211,15 +214,25 @@ function line(el, labels, series, o){
   el.innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(o.aria||'')}">${g}</svg>`;
 }
 let rz; window.addEventListener('resize',()=>{ clearTimeout(rz); rz=setTimeout(()=>{ const fs=charts.splice(0); fs.forEach(f=>f()); },160); });
-const legend = items => `<div class="legend">${items.map(([c,n])=>`<span><i style="background:var(${c})"></i>${esc(n)}</span>`).join('')}</div>`;
+const legend = (items,avg) => `<div class="legend">${items.map(([c,n])=>`<span><i style="background:var(${c})"></i>${esc(n)}</span>`).join('')}${avg?`<span><i style="background:none;border-top:2px dashed var(--muted);width:16px;height:0;border-radius:0;vertical-align:3px"></i>${esc(avg)}</span>`:''}</div>`;
 
 /* ---------- 집계 ---------- */
 function monthAgg(m){
   const r=D.recs.filter(x=>x[0]===m), rd=D.rounds.filter(x=>x[0]===m);
   const hy=r.reduce((a,x)=>a+x[4],0), rn=rd.reduce((a,x)=>a+x[2],0);
-  const ppl=t=>new Set(r.filter(x=>x[3]===t).map(x=>x[5]!=null?'r'+x[5]:x[2])).size;
-  return {m,hy,rn,tot:hy+rn,nn:ppl('신규'),mv:ppl('이동'),et:ppl('기타'),eds:rd.length};
+  const ppl=t=>new Set(r.filter(x=>stage(x)===t).map(x=>x[5]!=null?'r'+x[5]:x[2])).size;
+  const o={m,hy,rn,tot:hy+rn,n1:ppl('N1'),n2:ppl('N2'),nr:ppl('RN'),mv:ppl('MV'),eds:rd.length};
+  o.pp=o.n1+o.n2+o.nr+o.mv; return o;
 }
+/* 교육대상자 구분: 신규간호사 Ⅰ = 발령 1~6개월, Ⅱ = 7~12개월, 이후 간호사. 부서이동자는 따로 */
+function stage(x){
+  if(x[3]==='이동') return 'MV';
+  if(x[5]!=null){ const k=kOf(x[5],x[0]); return k<=6?'N1':k<=12?'N2':'RN'; }
+  return x[3]==='신규'?'N1':'RN';
+}
+const STAGES=[['N1','신규간호사 Ⅰ','--c-N1','발령 1~6개월'],['N2','신규간호사 Ⅱ','--c-N2','발령 7~12개월'],['RN','간호사','--c-RN','발령 13개월 이후·재직간호사'],['MV','부서이동자','--c-MV','']];
+const DEPT_ALIAS={'수술실':'OR','응급실':'ER','회복실':'RCR'};
+const deptOf=x=>x[5]!=null?(DEPT_ALIAS[roster[x[5]].dept]||roster[x[5]].dept):'명단 외';
 function edAgg(ed,ms){
   const r=D.recs.filter(x=>x[1]===ed&&ms.includes(x[0])), rd=D.rounds.filter(x=>x[1]===ed&&ms.includes(x[0]));
   const hy=r.reduce((a,x)=>a+x[4],0), rn=rd.reduce((a,x)=>a+x[2],0);
@@ -248,25 +261,43 @@ const phdr = page => `<div class="phdr">${esc(page.name)} · 조회 조건: ${es
 /* ---------- 1. 월별 교육현황 ---------- */
 function p1(main){
   const ms=selMonths(), A=ms.map(monthAgg);
-  const tot=A.reduce((a,x)=>a+x.tot,0), hy=A.reduce((a,x)=>a+x.hy,0), rn=A.reduce((a,x)=>a+x.rn,0), pp=A.reduce((a,x)=>a+x.nn+x.mv+x.et,0);
+  const tot=A.reduce((a,x)=>a+x.tot,0), hy=A.reduce((a,x)=>a+x.hy,0), rn=A.reduce((a,x)=>a+x.rn,0), pp=A.reduce((a,x)=>a+x.pp,0);
+  const sumOf=k=>A.reduce((a,x)=>a+x[k],0);
+  const SK={N1:'n1',N2:'n2',RN:'nr',MV:'mv'};
+  // 부서별 현장교육(신규명단 부서 기준, 부서라운딩 제외)
+  const recs=D.recs.filter(x=>ms.includes(x[0]));
+  const dmap={}; recs.forEach(x=>{const d=deptOf(x);const o=(dmap[d]=dmap[d]||{d,by:{},tot:0,ppl:new Set()});o.by[x[0]]=(o.by[x[0]]||0)+x[4];o.tot+=x[4];o.ppl.add(x[5]!=null?'r'+x[5]:x[2]);});
+  const DL=Object.values(dmap).sort((a,b)=>(a.d==='명단 외')-(b.d==='명단 외')||a.d.localeCompare(b.d,'ko',{numeric:true}));
+  const DR=DL.slice().sort((a,b)=>b.tot-a.tot);
   main.insertAdjacentHTML('beforeend',`
   <div class="kpis">
-    <div class="kpi"><div class="lab">총 교육시간</div><div class="val num">${fmtH(tot)}<small>시간</small></div><div class="sub">${fmt(tot)}분 · ${ms.length}개월</div></div>
-    <div class="kpi"><div class="lab">월평균 교육시간</div><div class="val num">${fmtH(tot/ms.length)}<small>시간</small></div><div class="sub">월 ${fmt(tot/ms.length)}분</div></div>
+    <div class="kpi"><div class="lab">총 교육시간</div><div class="val num">${fmt(tot)}<small>분</small></div><div class="sub">${fmtH(tot)}시간 · ${ms.length}개월</div></div>
+    <div class="kpi"><div class="lab">월평균 교육시간</div><div class="val num">${fmt(tot/ms.length)}<small>분</small></div><div class="sub">${fmtH(tot/ms.length)}시간</div></div>
     <div class="kpi"><div class="lab">교육대상자 연인원</div><div class="val num">${fmt(pp)}<small>명</small></div><div class="sub">월평균 ${fmt(pp/ms.length)}명</div></div>
-    <div class="kpi"><div class="lab">부서라운딩 비율</div><div class="val num">${(tot?rn/tot*100:0).toFixed(1)}<small>%</small></div><div class="sub">라운딩 ${fmtH(rn)}시간 / 총 ${fmtH(tot)}시간</div></div>
+    <div class="kpi"><div class="lab">부서라운딩 비율</div><div class="val num">${(tot?rn/tot*100:0).toFixed(1)}<small>%</small></div><div class="sub">라운딩 ${fmt(rn)}분 / 총 ${fmt(tot)}분</div></div>
   </div>
-  <div class="grid2">
-    <section class="card"><h2>월별 교육시간</h2><p class="hint">막대 위 숫자는 총 교육시간(시간)</p>${legend([['--c-HY','현장교육'],['--c-RD','부서라운딩']])}<div class="chart-wrap" id="g1"></div></section>
-    <section class="card"><h2>월별 교육대상자 수</h2><p class="hint">그 달 교육받은 사람 수(교육간호사가 달라도 1명)</p>${legend([['--c-NEW','신규간호사'],['--c-MV','부서이동자'],['--c-ETC','기타 간호사']])}<div class="chart-wrap" id="g2"></div></section>
+  <div class="grid2" style="align-items:start">
+    <section class="card"><h2>월별 교육시간</h2><p class="hint">단위 분. 막대 위 숫자는 총 교육시간, 점선은 조회 기간 월평균</p>${legend([['--c-HY','현장교육'],['--c-RD','부서라운딩']],'월평균')}<div class="chart-wrap" id="g1"></div></section>
+    <section class="card"><h2>월별 교육대상자 수</h2><p class="hint">그 달 교육받은 사람 수(교육간호사가 달라도 1명). 신규간호사 Ⅰ = 발령 1~6개월, Ⅱ = 7~12개월, 이후는 간호사</p>${legend(STAGES.map(s=>[s[2],s[1]]))}<div class="chart-wrap" id="g2"></div>
+      <div class="tw" style="margin-top:12px"><table id="t1b"><thead><tr><th>기준월</th>${STAGES.map(s=>`<th><span class="cdot" style="--cc:var(${s[2]})"></span>${s[1]}</th>`).join('')}<th class="tot">합계</th></tr></thead>
+      <tbody>${A.map(x=>`<tr><th>${ml(x.m)}</th>${STAGES.map(s=>`<td class="num">${z(x[SK[s[0]]])}</td>`).join('')}<td class="num tot">${fmt(x.pp)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr class="sum"><th>연인원</th>${STAGES.map(s=>`<td class="num">${fmt(sumOf(SK[s[0]]))}</td>`).join('')}<td class="num tot">${fmt(pp)}</td></tr></tfoot></table></div></section>
   </div>
   <section class="card">${tools('월별 상세','교육간호사 수는 그 달 업무보고를 제출한 인원','t1')}
-    <div class="tw" style="margin-top:10px"><table id="t1"><thead><tr><th>기준월</th><th>교육간호사</th><th><span class="cdot" style="--cc:var(--c-NEW)"></span>신규간호사</th><th><span class="cdot" style="--cc:var(--c-MV)"></span>부서이동자</th><th><span class="cdot" style="--cc:var(--c-ETC)"></span>기타</th><th><span class="cdot" style="--cc:var(--c-HY)"></span>현장교육(분)</th><th><span class="cdot" style="--cc:var(--c-RD)"></span>부서라운딩(분)</th><th class="tot">총 교육시간(분)</th><th>총 교육시간(시간)</th></tr></thead>
-    <tbody>${A.map(x=>`<tr><th>${ml(x.m)}</th><td class="num">${x.eds}</td><td class="num">${z(x.nn)}</td><td class="num">${z(x.mv)}</td><td class="num">${z(x.et)}</td><td class="num">${fmt(x.hy)}</td><td class="num">${z(x.rn)}</td><td class="num tot">${fmt(x.tot)}</td><td class="num">${fmtH(x.tot)}</td></tr>`).join('')}</tbody>
-    <tfoot><tr class="sum"><th>합계</th><td></td><td></td><td></td><td></td><td class="num">${fmt(hy)}</td><td class="num">${fmt(rn)}</td><td class="num tot">${fmt(tot)}</td><td class="num">${fmtH(tot)}</td></tr></tfoot></table></div></section>`);
-  const fh=v=>v.toLocaleString('ko-KR',{maximumFractionDigits:1})+'시간';
-  vbar(document.getElementById('g1'),ms.map(ml),[{name:'현장교육',c:'--c-HY',values:A.map(x=>x.hy/60)},{name:'부서라운딩',c:'--c-RD',values:A.map(x=>x.rn/60)}],{ft:fh,fy:v=>fmt(v)+'h',aria:'월별 교육시간'});
-  vbar(document.getElementById('g2'),ms.map(ml),[{name:'신규간호사',c:'--c-NEW',values:A.map(x=>x.nn)},{name:'부서이동자',c:'--c-MV',values:A.map(x=>x.mv)},{name:'기타 간호사',c:'--c-ETC',values:A.map(x=>x.et)}],{ft:v=>fmt(v)+'명',aria:'월별 교육대상자 수'});
+    <div class="tw" style="margin-top:10px"><table id="t1"><thead><tr><th>기준월</th><th>교육간호사</th>${STAGES.map(s=>`<th><span class="cdot" style="--cc:var(${s[2]})"></span>${s[1]}</th>`).join('')}<th><span class="cdot" style="--cc:var(--c-HY)"></span>현장교육(분)</th><th><span class="cdot" style="--cc:var(--c-RD)"></span>부서라운딩(분)</th><th class="tot">총 교육시간(분)</th></tr></thead>
+    <tbody>${A.map(x=>`<tr><th>${ml(x.m)}</th><td class="num">${x.eds}</td>${STAGES.map(s=>`<td class="num">${z(x[SK[s[0]]])}</td>`).join('')}<td class="num">${fmt(x.hy)}</td><td class="num">${z(x.rn)}</td><td class="num tot">${fmt(x.tot)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr class="sum"><th>합계</th><td></td>${STAGES.map(s=>`<td class="num">${fmt(sumOf(SK[s[0]]))}</td>`).join('')}<td class="num">${fmt(hy)}</td><td class="num">${fmt(rn)}</td><td class="num tot">${fmt(tot)}</td></tr></tfoot></table></div></section>
+  <section class="card">${tools('부서별 교육현황','현장교육시간만 집계(부서라운딩 제외). 부서는 신규명단의 부서, 명단에 없는 부서이동자·재직간호사는 \'명단 외\'로 묶음. 단위 분','t1c')}
+    <div class="grid2" style="margin-top:10px;align-items:start">
+      <div><p class="note" style="margin:0 0 6px">조회 기간 부서별 현장교육시간(분) · 많은 순</p><div class="chart-wrap" id="g1c"></div></div>
+      <div class="tw"><table id="t1c"><thead><tr><th>부서</th>${ms.map(m=>`<th>${ml(m)}</th>`).join('')}<th class="tot">합계</th><th>교육대상자(명)</th><th>1인당(분)</th></tr></thead>
+      <tbody>${DL.map(o=>`<tr><th>${esc(o.d)}</th>${ms.map(m=>`<td class="num">${z(o.by[m]||0)}</td>`).join('')}<td class="num tot">${fmt(o.tot)}</td><td class="num">${o.ppl.size}</td><td class="num">${fmt(o.tot/o.ppl.size)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr class="sum"><th>합계</th>${ms.map(m=>`<td class="num">${fmt(DL.reduce((a,o)=>a+(o.by[m]||0),0))}</td>`).join('')}<td class="num tot">${fmt(hy)}</td><td class="num">${new Set(recs.map(x=>x[5]!=null?'r'+x[5]:x[2])).size}</td><td></td></tr></tfoot></table></div>
+    </div></section>`);
+  const fm=v=>fmt(v)+'분';
+  vbar(document.getElementById('g1'),ms.map(ml),[{name:'현장교육',c:'--c-HY',values:A.map(x=>x.hy)},{name:'부서라운딩',c:'--c-RD',values:A.map(x=>x.rn)}],{ft:fm,avg:tot/ms.length,aria:'월별 교육시간(분)'});
+  vbar(document.getElementById('g2'),ms.map(ml),STAGES.map(s=>({name:s[1],c:s[2],values:A.map(x=>x[SK[s[0]]])})),{ft:v=>fmt(v)+'명',aria:'월별 교육대상자 수'});
+  hbar(document.getElementById('g1c'),DR.map(o=>o.d),[{name:'현장교육',c:'--c-HY',values:DR.map(o=>o.tot)}],{rowH:22,L:62,ft:fm,aria:'부서별 현장교육시간'});
 }
 
 /* ---------- 2. 교육간호사별 ---------- */
@@ -493,7 +524,7 @@ function initGoogle(){
   document.head.appendChild(s);
 }
 (async ()=>{
-  if (!API) { // 백엔드 연결 전(PC 미리보기): 같은 폴더 data.js 사용
+  if (!API || (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && new URLSearchParams(location.search).has('local'))) { // PC 미리보기: 같은 폴더 data.js 사용
     const s=document.createElement('script'); s.src='data.js';
     s.onload=()=>{ document.getElementById('logout').hidden=true; window.bootApp(window.EDU_DATA,'미리보기(PC 사본)'); };
     s.onerror=()=>showLogin('백엔드 주소(config.js 의 OPS_API)가 설정되지 않았습니다.');
