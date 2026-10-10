@@ -534,8 +534,8 @@ function p2(main){
 
   main.insertAdjacentHTML('beforeend',`
   <div class="kpis">
-    <div class="kpi"><div class="lab">교육간호사 구성</div><div class="val num" style="font-size:22px">전담 ${jeondam.length}<small>명</small> · 현장 ${fieldN}<small>명</small></div><div class="sub">${ml(lastM)} 기준 · 교육전담간호사 ${esc(jeondam.join(', '))} · 보고서 정리 ${A.length}명</div></div>
-    <div class="kpi"><div class="lab">1인당 총 교육시간</div><div class="val num">${fmt(A.length?sum/A.length:0)}<small>분</small></div><div class="sub">조회 기간 합계의 1인 평균</div></div>
+    <div class="kpi"><div class="lab">교육간호사 구성</div><div class="val num" style="font-size:20px;line-height:1.5">교육전담간호사 ${jeondam.length}<small>명</small><br>현장교육간호사 ${fieldN}<small>명</small></div></div>
+    <div class="kpi"><div class="lab">1인당 총 교육시간</div><div class="val num">${fmt(A.length?sum/A.length:0)}<small>분 (${fmtH(A.length?sum/A.length:0)}시간)</small></div><div class="sub">조회 기간 합계의 1인 평균</div></div>
     <div class="kpi"><div class="lab">1인당 월평균 교육시간</div><div class="val num">${fmt(reps?sum/reps:0)}<small>분</small></div><div class="sub">보고서 1건(1개월)당 평균</div></div>
     <div class="kpi"><div class="lab">평균 교육대상자</div><div class="val num">${(reps?pmSum/reps:0).toLocaleString('ko-KR',{maximumFractionDigits:1})}<small>명</small></div><div class="sub">교육간호사 1인 · 월 기준</div></div>
   </div>
