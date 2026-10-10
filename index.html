@@ -86,6 +86,15 @@
 /* 나란히 놓인 카드: 표를 카드 아래쪽에 맞춰 두 표의 줄이 같은 높이에 오도록 */
 .grid2.eq{align-items:stretch}
 .eqcard{display:flex;flex-direction:column}
+.dupwarn{padding:12px 14px;border-radius:var(--r);border:1px solid color-mix(in srgb,var(--crit) 35%,transparent);border-left:4px solid var(--crit);background:color-mix(in srgb,var(--crit) 7%,transparent);font-size:13.5px;color:var(--crit-ink)}
+.bform{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 14px;margin-top:12px}
+.bform label{display:grid;gap:5px;font-size:12.5px;font-weight:600;color:var(--ink2)}
+.bform label.wide{grid-column:span 2}
+.bform input,.bform select{height:38px;border:1px solid var(--line2);border-radius:10px;padding:0 10px;background:var(--surface);color:var(--ink);font:inherit;font-size:14px;font-weight:400}
+.bform .tg button{padding:8px 14px}
+.bform.off{opacity:.5;pointer-events:none}
+.bcheck{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin-top:10px}
+@media (max-width:820px){.bform{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:12px}
 @media (max-width:1100px){.rules{grid-template-columns:minmax(0,1fr)}}
 .rule{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--surface)}
@@ -834,7 +843,68 @@ function p4(main){
 }
 
 /* ---------- 5. 사업신고 인력 관리 ---------- */
+/* 사업 신고 인력 변경 입력 */
+const BF={type:'add', biz:null, role:'', name:'', id:'', unit:'', out:'', reason:'', note:'', busy:false, msg:''};
+const ROLES=['교육전담','현장교육','교육전담(간호간병)'];
+function bizForm(BMS){
+  const box=document.getElementById('bizin'); if(!box) return;
+  const can=!!window.opsCall&&opt.team;
+  const m=S.bizMonth, last=BMS[BMS.length-1];
+  const nextOf=mm=>{ const d=new Date(+mm.slice(0,4), +mm.slice(5), 1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); };
+  const known={}; D.biz.forEach(x=>{ known[x[3]]={id:x[4],unit:x[5],role:x[2],biz:x[1]}; });
+  const names=[...new Set([...Object.keys(known),...EDS])].sort((a,b)=>a.localeCompare(b,'ko'));
+  if(!BF.biz) BF.biz=BIZ[0];
+  const actNow=b=>D.biz.filter(x=>x[0]===m&&x[1]===b&&x[6]==='신고');
+  const outList=actNow(BF.biz).map(x=>x[3]);
+  if(BF.out&&!outList.includes(BF.out)) BF.out='';
+  /* 저장 전 점검 */
+  const willAdd=BF.type!=='remove'&&BF.name.trim(), willOut=BF.type!=='add'&&BF.out;
+  const after=BIZ.map(b=>{ let n=actNow(b).length; if(b===BF.biz){ if(willOut) n--; if(willAdd&&!actNow(b).some(x=>x[3]===BF.name.trim())) n++; } return [b,n]; });
+  const dupHit=willAdd?D.biz.filter(x=>x[0]===m&&x[6]==='신고'&&x[3]===BF.name.trim()&&x[1]!==BF.biz&&!(willOut&&x[3]===BF.out&&x[1]===BF.biz)):[];
+  const err=[]; if(BF.type!=='remove'&&!BF.name.trim()) err.push('추가할 성명을 입력하세요'); if(BF.type!=='add'&&!BF.out) err.push('제외할 인력을 고르세요'); if(BF.type!=='remove'&&!BF.role) err.push('역할을 고르세요');
+  if(dupHit.length) err.push(`${BF.name.trim()}은(는) ${ml(m)}에 이미 ${dupHit.map(x=>BIZ_SHORT[x[1]]).join('·')} 사업에 신고돼 있어요 — 중복 신고는 지원금 환수 대상이라 저장할 수 없어요`);
+  const hasMonth=D.biz.some(x=>x[0]===m);
+  box.innerHTML=`<div class="hd-row"><div><h2>신고 인력 변경 입력</h2><p class="hint" style="margin:0">${ml(m)} 기준 · 저장하면 구글시트 [사업별 신고인력] 탭에 바로 반영돼요. 같은 달 다른 사업에 이미 신고된 사람은 저장되지 않아요.</p></div>
+    ${can?`<button class="btn" id="bfnew" title="${ml(last)} 신고 인력을 그대로 복사해 새 달을 만들어요">${ml(nextOf(last))} 신고 시작(${ml(last)} 복사)</button>`:''}</div>
+    ${!can?`<div class="callout" style="margin-top:10px">${window.opsCall?'입력은 간호교육팀만 할 수 있어요.':'PC 미리보기에서는 입력할 수 없어요. 배포된 대시보드에 로그인해서 사용하세요.'}</div>`:''}
+    <div class="bform${can?'':' off'}">
+      <label>사업<select id="bf-biz">${BIZ.map(b=>`<option value="${esc(b)}" ${b===BF.biz?'selected':''}>${esc(b)}</option>`).join('')}</select></label>
+      <label>변경 유형<div class="tg" id="bf-type">${[['add','추가'],['remove','제외'],['swap','교체']].map(([k,n])=>`<button type="button" data-t="${k}" aria-pressed="${BF.type===k}">${n}</button>`).join('')}</div></label>
+      ${BF.type!=='add'?`<label>제외할 인력<select id="bf-out"><option value="">선택</option>${outList.map(n=>`<option ${n===BF.out?'selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}
+      ${BF.type!=='remove'?`<label>추가할 성명<input id="bf-name" list="bf-names" value="${esc(BF.name)}" placeholder="이름 입력 또는 선택"><datalist id="bf-names">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist></label>
+      <label>사원번호<input id="bf-id" value="${esc(BF.id)}" placeholder="예: H11183"></label>
+      <label>역할<select id="bf-role"><option value="">선택</option>${ROLES.map(r=>`<option ${r===BF.role?'selected':''}>${r}</option>`).join('')}</select></label>
+      <label>소속 담당<input id="bf-unit" value="${esc(BF.unit)}" placeholder="예: 중환자"></label>`:''}
+      <label class="wide">변동사유<input id="bf-reason" value="${esc(BF.reason)}" placeholder="예: 황연희 리프레쉬, 교대제 신고변경"></label>
+      <label>비고<input id="bf-note" value="${esc(BF.note)}" placeholder="예: 복귀"></label>
+    </div>
+    <div class="bcheck">${after.map(([b,n])=>`<span class="okline ${n===D.bizStd[b]?'':'bad'}"><i></i>${BIZ_SHORT[b]} ${n}/${D.bizStd[b]}명</span>`).join('')}<span class="note">← 저장 후 ${ml(m)} 인원</span></div>
+    ${err.length&&(BF.name||BF.out)?`<div class="${dupHit.length?'dupwarn':'callout'}" style="margin-top:8px">${err.map(esc).join('<br>')}</div>`:''}
+    ${BF.msg?`<div class="callout" style="margin-top:8px">${esc(BF.msg)}</div>`:''}
+    <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end"><button class="btn" id="bf-clr">지우기</button><button class="btn pri" id="bf-save" ${!can||err.length||BF.busy?'disabled':''}>${BF.busy?'저장 중…':ml(m)+' 저장'}</button></div>`;
+  const $=id=>document.getElementById(id);
+  const keep=()=>{ ['name','id','unit','reason','note'].forEach(k=>{ const el=$('bf-'+k); if(el) BF[k]=el.value; }); const r=$('bf-role'); if(r) BF.role=r.value; const o=$('bf-out'); if(o) BF.out=o.value; };
+  const redraw=()=>{ keep(); bizForm(BMS); };
+  $('bf-biz').onchange=e=>{ keep(); BF.biz=e.target.value; BF.out=''; bizForm(BMS); };
+  box.querySelectorAll('#bf-type [data-t]').forEach(b=>b.onclick=()=>{ keep(); BF.type=b.dataset.t; bizForm(BMS); });
+  if($('bf-out')) $('bf-out').onchange=redraw;
+  if($('bf-role')) $('bf-role').onchange=redraw;
+  if($('bf-name')) $('bf-name').onchange=()=>{ keep(); const k=known[BF.name.trim()]; if(k){ if(!BF.id) BF.id=k.id; if(!BF.unit) BF.unit=k.unit; if(!BF.role&&k.biz===BF.biz) BF.role=k.role; } bizForm(BMS); };
+  ['bf-id','bf-unit','bf-reason','bf-note'].forEach(id=>{ const el=$(id); if(el) el.onchange=keep; });
+  $('bf-clr').onclick=()=>{ Object.assign(BF,{name:'',id:'',unit:'',out:'',reason:'',note:'',role:'',msg:''}); bizForm(BMS); };
+  const save=async body=>{ BF.busy=true; BF.msg=''; bizForm(BMS);
+    try{ const r=await window.opsCall(body); D.biz=r.biz; BF.msg='저장했어요: '+r.log.join(', '); Object.assign(BF,{name:'',id:'',unit:'',out:'',reason:'',note:'',role:''}); }
+    catch(e){ BF.msg='저장하지 못했어요: '+e.message; }
+    BF.busy=false; render(); };
+  if($('bf-save')) $('bf-save').onclick=()=>{ keep(); const ops=[]; if(BF.type!=='add') ops.push({type:'remove',biz:BF.biz,name:BF.out,reason:BF.reason,note:BF.note}); if(BF.type!=='remove') ops.push({type:'add',biz:BF.biz,role:BF.role,name:BF.name.trim(),id:BF.id.trim(),unit:BF.unit.trim(),reason:BF.reason,note:BF.note});
+    if(!confirm(`${ml(m)} ${BIZ_SHORT[BF.biz]} 사업: ${ops.map(o=>(o.type==='add'?'추가 ':'제외 ')+o.name).join(', ')} — 저장할까요?`)) return; save({action:'bizSave',month:m,ops}); };
+  if($('bfnew')) $('bfnew').onclick=()=>{ const to=nextOf(last); if(!confirm(`${ml(last)} 신고 인력을 그대로 복사해 ${ml(to)} 신고를 시작할까요?`)) return; S.bizMonth=to; save({action:'bizSave',month:to,copyFrom:last,ops:[]}); };
+}
+
+
 function p5(main){
+  const BMS=[...new Set(D.biz.map(b=>b[0]))].sort();
+  if(!BMS.includes(S.bizMonth)) S.bizMonth=BMS[BMS.length-1];
   const m=S.bizMonth;
   const cnt=(mm,b)=>D.biz.filter(x=>x[0]===mm&&x[1]===b&&x[6]==='신고').length;
   const okM=mm=>BIZ.every(b=>cnt(mm,b)===D.bizStd[b]);
@@ -866,14 +936,16 @@ function p5(main){
       ['추가','인력 추가 배치 시 지원요건 충족일로부터 10일 이내 교부 신청'],
       ['자료','분기별 보고(재직증명서·업무실적·교육대상자 현황·전용계좌 내역), 정산 12.22~12.30']]}
   ];
-  const dupM=(()=>{ const by={}; D.biz.filter(x=>x[0]===m&&x[6]==='신고').forEach(x=>{ (by[x[3]]=by[x[3]]||new Set()).add(x[1]); }); return Object.entries(by).filter(([,s])=>s.size>1); })();
+  const dupOf=mm=>{ const by={}; D.biz.filter(x=>x[0]===mm&&x[6]==='신고').forEach(x=>{ (by[x[3]]=by[x[3]]||new Set()).add(x[1]); }); return Object.entries(by).filter(([,s])=>s.size>1); };
+  const dupAll=BMS.map(mm=>[mm,dupOf(mm)]).filter(([,d])=>d.length);
   main.insertAdjacentHTML('beforeend',`
-  ${dupM.length?`<div class="callout" style="border-left-color:var(--crit);background:color-mix(in srgb,var(--crit) 7%,transparent)"><b>${ml(m)} 중복 신고 확인 필요</b> · ${dupM.map(([n,s])=>`${esc(n)}(${[...s].map(b=>BIZ_SHORT[b]).join('·')})`).join(', ')} — 교대제·필수의료 지침은 유사 지원사업과 같은 인력의 중복 배치를 허용하지 않아요(중복 확인 시 환수 가능).</div>`:''}
+  ${dupAll.length?`<div class="dupwarn"><b>⚠ 중복 신고 발견 — 지원금 환수 대상이 될 수 있어요</b><div>${dupAll.map(([mm,d])=>`<span class="st rsg" style="margin:4px 6px 0 0">${ml(mm)} · ${d.map(([n,s])=>`${esc(n)}(${[...s].map(b=>BIZ_SHORT[b]).join('·')})`).join(', ')}</span>`).join('')}</div><div class="note" style="margin-top:6px">교대제·필수의료 지침은 유사 지원사업과 같은 인력의 중복 배치를 허용하지 않아요. 한 사업에서 제외하거나 다른 인력으로 바꿔 주세요.</div></div>`:''}
   <section class="card"><div class="hd-row"><div><h2>교육간호사 인력 변경 시 신고 기준</h2><p class="hint" style="margin:0">사업별 지침 요약 · 2026-10-11 확인 · 실제 신고 전 최신 지침을 꼭 확인하세요</p></div></div>
     <div class="rules">${RULES.map(r=>{ const c=chg(r.b); return `<div class="rule"><div class="rh"><b>${esc(BIZ_SHORT[r.b]==='통합'?'간호간병':BIZ_SHORT[r.b]==='교대제'?'교대제 개선':'필수의료')}</b><span class="due${r.ok?'':' unk'}">${esc(r.due)}</span></div>
       ${c.length?`<div class="rnow">${ml(m)} 변동 ${c.length}건 · ${r.b.indexOf('교대제')>=0?`${nextM(m)} 5일까지 신고`:r.ok?'변경일로부터 7일 이내 신고':'위탁기관 확인'}</div>`:''}
       <dl>${r.items.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl><p class="note" style="margin:8px 0 0">${esc(r.src)}</p></div>`; }).join('')}</div></section>
   <div class="card tools" style="padding:14px 20px"><div class="seg"><span class="gl">기준월</span>${BMS.map(mm=>`<button class="chip" data-bm="${mm}" aria-pressed="${mm===m}">${ml(mm)}</button>`).join('')}</div></div>
+  <section class="card" id="bizin"></section>
   <div class="kpis">
     <div class="kpi"><div class="lab">${ml(m)} 신고 인원</div><div class="val num">${BIZ.reduce((a,b)=>a+cnt(m,b),0)}<small>/ ${stdSum}명</small></div><div class="sub">${okM(m)?'사업별 기준 인원 충족':'기준 인원과 다름 — 확인 필요'}</div></div>
     ${BIZ.map(b=>`<div class="kpi"><div class="lab">${BIZ_SHORT[b]==='통합'?'간호간병':BIZ_SHORT[b]==='교대제'?'교대제 개선':'필수의료'}</div><div class="val num">${cnt(m,b)}<small>/ ${D.bizStd[b]}명</small></div><div class="sub">${cnt(m,b)===D.bizStd[b]?'정상':'확인 필요'}</div></div>`).join('')}
@@ -884,23 +956,24 @@ function p5(main){
       ${rows.filter(x=>x[6]==='제외').map(x=>`<div class="mem out"><b>${esc(x[3])}</b><span class="st out">제외</span></div>`).join('')}</section>`;}).join('')}</div>
   <div class="grid2">
     <section class="card">${tools('월별 신고 인원 점검','기준 인원과 다르면 확인 필요','t7')}
-      <div class="tw" style="margin-top:10px"><table id="t7"><thead><tr><th>기준월</th>${BIZ.map(b=>`<th><span class="cdot" style="--cc:var(${BIZ_C[b]})"></span>${BIZ_SHORT[b]}</th>`).join('')}<th class="tot">합계</th><th>변동</th><th style="text-align:center">점검</th></tr></thead><tbody>
-      <tr><th class="note">기준</th>${BIZ.map(b=>`<td class="num note">${D.bizStd[b]}</td>`).join('')}<td class="num tot note">${stdSum}</td><td></td><td></td></tr>
-      ${BMS.map(mm=>`<tr><th>${mm===m?`<span class="chg">${ml(mm)}</span>`:ml(mm)}</th>${BIZ.map(b=>`<td class="num">${cnt(mm,b)}</td>`).join('')}<td class="num tot">${BIZ.reduce((a,b)=>a+cnt(mm,b),0)}</td><td class="num">${chM(mm)?chM(mm)+'건':'<span class="zero">·</span>'}</td><td style="text-align:center"><span class="okline ${okM(mm)?'':'bad'}"><i></i>${okM(mm)?'정상':'확인'}</span></td></tr>`).join('')}</tbody></table></div></section>
+      <div class="tw" style="margin-top:10px"><table id="t7"><thead><tr><th>기준월</th>${BIZ.map(b=>`<th><span class="cdot" style="--cc:var(${BIZ_C[b]})"></span>${BIZ_SHORT[b]}</th>`).join('')}<th class="tot">합계</th><th>변동</th><th>중복</th><th style="text-align:center">점검</th></tr></thead><tbody>
+      <tr><th class="note">기준</th>${BIZ.map(b=>`<td class="num note">${D.bizStd[b]}</td>`).join('')}<td class="num tot note">${stdSum}</td><td></td><td></td><td></td></tr>
+      ${BMS.map(mm=>`<tr><th>${mm===m?`<span class="chg">${ml(mm)}</span>`:ml(mm)}</th>${BIZ.map(b=>`<td class="num">${cnt(mm,b)}</td>`).join('')}<td class="num tot">${BIZ.reduce((a,b)=>a+cnt(mm,b),0)}</td><td class="num">${chM(mm)?chM(mm)+'건':'<span class="zero">·</span>'}</td><td class="num">${dupOf(mm).length?`<span class="st rsg">${dupOf(mm).length}명</span>`:'<span class="zero">·</span>'}</td><td style="text-align:center"><span class="okline ${okM(mm)&&!dupOf(mm).length?'':'bad'}"><i></i>${okM(mm)&&!dupOf(mm).length?'정상':'확인'}</span></td></tr>`).join('')}</tbody></table></div></section>
     <section class="card"><h2>변동 이력</h2><p class="hint">추가·제외가 있었던 달 (최근 순)</p>${
       BMS.filter(chM).reverse().map(mm=>`<div class="tline"><div class="m">${ml(mm)}</div><div>${BIZ.map(b=>{const ad=D.biz.filter(x=>x[0]===mm&&x[1]===b&&x[7]==='추가'),rm=D.biz.filter(x=>x[0]===mm&&x[1]===b&&x[7]==='제외');if(!ad.length&&!rm.length)return '';
         const why=[...new Set(ad.concat(rm).map(x=>x[8]||x[9]).filter(Boolean))].join(' / ');
-        return `<div style="margin-bottom:4px"><span class="kc" style="--cc:var(${BIZ_C[b]})"><i></i>${BIZ_SHORT[b]}</span> ${rm.map(x=>`<span class="st out">${esc(x[3])}</span>`).join(' ')} → ${ad.map(x=>`<span class="st add">${esc(x[3])}</span>`).join(' ')}${why?`<div class="note">${esc(why)}</div>`:''}</div>`;}).join('')}</div></div>`).join('')}</section>
+        return `<div style="margin-bottom:4px"><span class="kc" style="--cc:var(${BIZ_C[b]})"><i></i>${BIZ_SHORT[b]}</span> ${rm.length?rm.map(x=>`<span class="st out">${esc(x[3])}</span>`).join(' '):'<span class="note">(신규)</span>'} → ${ad.length?ad.map(x=>`<span class="st add">${esc(x[3])}</span>`).join(' '):'<span class="st rsg">대체 미정</span>'}${why?`<div class="note">${esc(why)}</div>`:''}</div>`;}).join('')}</div></div>`).join('')}</section>
   </div>
   <section class="card">${tools('인력별 월간 신고 현황','통합 = 간호간병, 교대제 = 교대제 개선, 필수 = 필수의료. 굵은 글씨는 교육전담 역할, <span class="chg">파란 글씨</span>는 직전 달과 달라진 달','t8')}
     <div class="tw" style="margin-top:10px"><table id="t8"></table></div></section>`);
   document.querySelectorAll('[data-bm]').forEach(b=>b.onclick=()=>{S.bizMonth=b.dataset.bm;render();});
+  bizForm(BMS);
   const people=[...new Set(D.biz.map(x=>x[3]))];
   const cellOf=(p,mm)=>D.biz.filter(x=>x[3]===p&&x[0]===mm&&x[6]==='신고').map(x=>x[2].startsWith('교육전담')&&!x[2].includes('간호간병')?`<b>${BIZ_SHORT[x[1]]}</b>`:BIZ_SHORT[x[1]]).join(', ');
   const ord=p=>{const f=D.biz.find(x=>x[3]===p&&x[6]==='신고');return BIZ.indexOf(f?f[1]:'');};
   people.sort((a,b)=>ord(a)-ord(b)||a.localeCompare(b,'ko'));
   document.getElementById('t8').innerHTML=`<thead><tr><th>성명</th>${BMS.map(mm=>`<th style="text-align:center">${ml(mm)}</th>`).join('')}</tr></thead><tbody>`+
-    people.map(p=>`<tr><th>${esc(p)}</th>${BMS.map((mm,i)=>{const v=cellOf(p,mm),pv=i?cellOf(p,BMS[i-1]):v;return `<td style="text-align:center">${v?(i&&v!==pv?`<span class="chg">${v}</span>`:v):(i&&pv?'<span class="out-n">제외</span>':'–')}</td>`;}).join('')}</tr>`).join('')+'</tbody>';
+    people.map(p=>`<tr><th>${esc(p)}</th>${BMS.map((mm,i)=>{const v=cellOf(p,mm),pv=i?cellOf(p,BMS[i-1]):v;const dup=D.biz.filter(x=>x[3]===p&&x[0]===mm&&x[6]==='신고').length>1;return `<td style="text-align:center">${v?(dup?`<span class="st rsg" title="중복 신고">${v}</span>`:i&&v!==pv?`<span class="chg">${v}</span>`:v):(i&&pv?'<span class="out-n">제외</span>':'–')}</td>`;}).join('')}</tr>`).join('')+'</tbody>';
 }
 
 /* ---------- 6. 업무보고 올리기 ---------- */
