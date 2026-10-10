@@ -1254,7 +1254,7 @@ function render(){
   applyFilter();
   syncFilter(page);
   const main=document.getElementById('main');
-  main.innerHTML=phdr(page)+`<div class="head head-row"><div><h1>${esc(page.name)}</h1><p>${esc(page.desc)}</p></div>${page.id==='p1'||page.id==='p2'?`<div class="tg no-print" id="ljh" title="이진호 교육간호사(전담간호사 교육) 자료를 넣거나 빼고 봐요"><button data-v="1" aria-pressed="${S.ljh!==false}">이진호 포함</button><button data-v="0" aria-pressed="${S.ljh===false}">이진호 제외</button></div>`:''}<div class="pp-wrap no-print"><button class="btn" data-pprint title="기본은 페이지 전체 · 구역을 골라 출력할 수도 있어요">🖨 페이지 출력</button></div></div>`+
+  main.innerHTML=phdr(page)+`<div class="head head-row"><div><h1>${esc(page.name)}</h1><p>${esc(page.desc)}</p></div>${page.id==='p1'||page.id==='p2'?`<div class="tg no-print" id="ljh" title="PAM(전담간호사) 교육 자료(이진호 교육간호사)를 넣거나 빼고 봐요"><button data-v="1" aria-pressed="${S.ljh!==false}">PAM 포함</button><button data-v="0" aria-pressed="${S.ljh===false}">PAM 제외</button></div>`:''}<div class="pp-wrap no-print"><button class="btn" data-pprint title="기본은 페이지 전체 · 구역을 골라 출력할 수도 있어요">🖨 페이지 출력</button></div></div>`+
     (page.period&&R.unitOn?`<div class="callout">간호단위(${esc([...S.groups,...S.units].join(', '))})를 골라 교육대상자 부서로 걸렀어요. 부서라운딩은 부서별로 나뉘지 않아 이 조건에서는 빠지고, 신규명단에 없는 인원('명단 외')도 빠져요.</div>`:'');
   const lj=document.getElementById('ljh'); if(lj) lj.onclick=e=>{ const b=e.target.closest('[data-v]'); if(!b) return; S.ljh=b.dataset.v==='1'; render(); };
   if(S.page==='p3') main.insertAdjacentHTML('beforeend','<div class="callout">이 페이지는 신규간호사 현장교육 분석이라, 전담간호사(PAM)를 교육하는 이진호 교육간호사 자료는 빼고 보여요.</div>');
