@@ -69,6 +69,7 @@
 @media (max-width:1100px){.grid2.eq,.grid2.cr{grid-template-columns:minmax(0,1fr)}}
 .eqcard .tw{margin-top:12px}
 table.h2r thead tr:nth-child(2) th{top:34px}
+#t2 thead tr:nth-child(2) th{min-width:52px}#t2 th,#t2 td{padding:8px 8px}
 table.h2r thead tr:first-child th[colspan]{border-left:1px solid var(--line2)}
 table.h2r thead tr:nth-child(2) th:nth-child(odd){border-left:1px solid var(--line2)}
 .chip.nod{color:var(--muted);border-style:dashed}
@@ -532,11 +533,13 @@ function p2(main){
       <tr>${STAGES.map(()=>`<th>인원(명)</th><th>시간(분)</th>`).join('')}</tr></thead>
       <tbody>${A.map(a=>`<tr data-ed="${esc(a.ed)}" title="누르면 개인별 상세"><th>${a.ed===S.ed?`<span class="chg">${esc(dn(a.ed))}</span>`:esc(dn(a.ed))}</th>${STAGES.map(([k])=>`<td class="num">${z(a.st[k].n)}</td><td class="num">${z(a.st[k].min)}</td>`).join('')}<td class="num">${z(a.rn)}</td><td class="num tot">${fmt(a.tot)}</td></tr>`).join('')}</tbody>
       <tfoot><tr class="sum"><th>합계 (실인원 중복 제외)</th>${STAGES.map(([k])=>`<td class="num">${fmt(uniq(k))}</td><td class="num">${fmt(uniqMin(k))}</td>`).join('')}<td class="num">${fmt(rnSum)}</td><td class="num tot">${fmt(sum)}</td></tr></tfoot></table></div></section>
-  <section class="card">${tools('교육간호사별 월별 교육시간','단위 분 · 행을 누르면 개인별 상세','t2')}
-    <div class="tw" style="margin-top:10px"><table id="t2"><thead><tr><th>교육간호사</th>${ms.map(m=>`<th>${ml(m)}</th>`).join('')}<th class="tot">합계</th><th>월평균</th></tr></thead>
-    <tbody>${A.map(a=>{ const per=ms.map(m=>edAgg(a.ed,[m]));
-      return `<tr data-ed="${esc(a.ed)}" title="누르면 개인별 상세"><th>${a.ed===S.ed?`<span class="chg">${esc(dn(a.ed))}</span>`:esc(dn(a.ed))}</th>${per.map(x=>`<td class="num">${x.reports?fmt(x.tot):'–'}</td>`).join('')}<td class="num tot">${fmt(a.tot)}</td><td class="num">${fmt(a.avgMin)}</td></tr>`; }).join('')}</tbody>
-    <tfoot><tr class="sum"><th>합계</th>${ms.map(m=>`<td class="num">${fmt(A.reduce((s,a)=>s+edAgg(a.ed,[m]).tot,0))}</td>`).join('')}<td class="num tot">${fmt(sum)}</td><td class="num">${fmt(reps?sum/reps:0)}</td></tr></tfoot></table></div></section>
+  <section class="card">${tools('교육간호사별 월별 교육인원 · 교육시간','인원 = 그 달 현장교육한 실인원(명), 시간 = 현장교육+부서라운딩(분) · 합계 인원은 기간 실인원 · 행을 누르면 개인별 상세','t2')}
+    <div class="tw" style="margin-top:10px"><table id="t2" class="h2r"><thead>
+      <tr><th rowspan="2">교육간호사</th>${ms.map(m=>`<th colspan="2" style="text-align:center">${ml(m)}</th>`).join('')}<th colspan="2" style="text-align:center" class="tot">합계</th><th colspan="2" style="text-align:center">월평균</th></tr>
+      <tr>${[...ms,'T','A'].map(()=>`<th>인원</th><th>시간</th>`).join('')}</tr></thead>
+    <tbody>${A.map(a=>{ const per=ms.map(m=>({x:edAgg(a.ed,[m]),n:new Set(recsOf(a.ed,[m]).map(pk2)).size}));
+      return `<tr data-ed="${esc(a.ed)}" title="누르면 개인별 상세"><th>${a.ed===S.ed?`<span class="chg">${esc(dn(a.ed))}</span>`:esc(dn(a.ed))}</th>${per.map(({x,n})=>x.reports?`<td class="num">${z(n)}</td><td class="num">${fmt(x.tot)}</td>`:'<td class="num">–</td><td class="num">–</td>').join('')}<td class="num tot">${fmt(a.ppl)}</td><td class="num"><b>${fmt(a.tot)}</b></td><td class="num">${a.avgPpl.toLocaleString('ko-KR',{maximumFractionDigits:1})}</td><td class="num">${fmt(a.avgMin)}</td></tr>`; }).join('')}</tbody>
+    <tfoot><tr class="sum"><th>합계 (실인원)</th>${ms.map(m=>{ const rr=allRecs.filter(x=>x[0]===m); return `<td class="num">${fmt(new Set(rr.map(pk2)).size)}</td><td class="num">${fmt(A.reduce((s,a)=>s+edAgg(a.ed,[m]).tot,0))}</td>`; }).join('')}<td class="num tot">${fmt(new Set(allRecs.map(pk2)).size)}</td><td class="num">${fmt(sum)}</td><td class="num">${(reps?pmSum/reps:0).toLocaleString('ko-KR',{maximumFractionDigits:1})}</td><td class="num">${fmt(reps?sum/reps:0)}</td></tr></tfoot></table></div></section>
   <section class="card" id="edd"></section>`);
   combo(document.getElementById('g2c'), A.map(a=>dn(a.ed)), A.map(a=>a.avgMin), A.map(a=>a.avgPpl), {
     keys:A.map(a=>a.ed), sel:S.ed, click:k=>{S.ed=k;render();document.getElementById('edd').scrollIntoView({behavior:'smooth'});},
