@@ -8,14 +8,29 @@
 <!-- 디자인 시스템: 디자인시스템_간호교육대시보드/dashboard.css 그대로. 이 대시보드 구분 색만 아래에서 지정 -->
 <link rel="stylesheet" href="dashboard.css">
 <style>
-/* 이 대시보드의 데이터 구분 색 — 차분한 6색 팔레트(색각 이상 검사 통과: 라이트·다크 각각)
- * v1 블루 · v2 살구 · v3 청록 · v4 라벤더 · v5 머스터드 · v6 로즈 */
+/* 화면 테마 — 블루 포인트 + 무채색 표면·글자 (dashboard.css 기본값 덮어쓰기) */
 :root{
-  --v1:#3f6fb0;--v2:#d98a4e;--v3:#1e9f8f;--v4:#7c69c0;--v5:#c9a227;--v6:#c4607a;--v0:#a3abb9;
+  --bg:#f7f7f7;--surface:#fff;--sunk:#eef0f3;--ink:#0a0b0d;--ink2:#5b616e;--muted:#7c828a;
+  --line:#dee1e6;--line2:#cfd3da;--accent:#0052ff;--accent-ink:#fff;--accent-soft:#e8efff;
+  --navy:#0a0b0d;--navy2:#24272d;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0a0b0d;--surface:#16181c;--sunk:#111316;--ink:#f2f3f5;--ink2:#a8acb3;--muted:#7c828a;
+  --line:#25282e;--line2:#33373e;--accent:#4d82ff;--accent-ink:#fff;--accent-soft:#122142;
+  --navy:#16181c;--navy2:#2a2e35;
+}}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .org b,:root:not([data-theme="light"]) .tline .m,:root:not([data-theme="light"]) #who{color:var(--ink)!important}}
+.logo-sq{box-shadow:0 4px 10px rgba(0,82,255,.28)}
+.navcard{box-shadow:0 6px 18px rgba(10,11,13,.18)}
+
+/* 이 대시보드의 데이터 구분 색 — 네이비 조화형 6색(색각 이상 검사 통과: 라이트·다크 각각, 부서군·대상자 순서 포함)
+ * v1 네이비블루 · v2 샌드 · v3 청록 · v4 라벤더 · v5 모스그린 · v6 로즈 */
+:root{
+  --v1:#2c5aa0;--v2:#d9935a;--v3:#1f9c96;--v4:#7f6fbf;--v5:#597b3a;--v6:#b8657a;--v0:#a3abb9;
   --k1:#93b0db;--k2:#7699cf;--k3:#5b82c0;--k4:#4570ae;--k5:#345d98;--k6:#274a7c;--k0:#c9ced8; /* 발령 개월차 1→6 (밝음→진함) */
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --v1:#5b86c8;--v2:#c97d45;--v3:#1f9a89;--v4:#8a78cf;--v5:#a98a26;--v6:#c86a82;--v0:#5d6779;
+  --v1:#3968af;--v2:#c6762c;--v3:#04a19b;--v4:#6b5aa8;--v5:#6e9c43;--v6:#9c4b61;--v0:#5d6779;
   --k1:#2f5894;--k2:#3e6cab;--k3:#5282c2;--k4:#6d9ad5;--k5:#8fb3e3;--k6:#b5cdef;--k0:#3a4357;
 }}
 :root{
@@ -25,8 +40,8 @@
   --c-NEW:var(--v1);--c-ETC:var(--v3);
   --c-K1:var(--v1);--c-K2:var(--v2);--c-K3:var(--v3);--c-K4:var(--v4); /* 발령 차수 비교 */
   --c-B1:var(--v3);--c-B2:var(--v1);--c-B3:var(--v6); /* 사업 */
-  --c-G1:var(--v1);--c-G2:var(--v3);--c-G3:var(--v4);--c-G4:var(--v6);--c-G5:var(--v5);--c-G6:var(--v2);--c-G0:var(--v0); /* 부서군 */
-  --c-P1:var(--v1);--c-P2:var(--v3);--c-P3:var(--v4);--c-P4:var(--v6);--c-P5:var(--v5);--c-P6:var(--v2); /* 교육간호사 배치구분 */
+  --c-G1:var(--v1);--c-G2:var(--v3);--c-G3:var(--v4);--c-G4:var(--v5);--c-G5:var(--v6);--c-G6:var(--v2);--c-G0:var(--v0); /* 부서군 */
+  --c-P1:var(--v1);--c-P2:var(--v3);--c-P3:var(--v4);--c-P4:var(--v5);--c-P5:var(--v6);--c-P6:var(--v2); /* 교육간호사 배치구분 */
 }
 /* 이 대시보드에서 추가로 쓰는 작은 부품 (디자인 시스템 규칙 안에서) */
 .chart-wrap{width:100%}
@@ -49,6 +64,8 @@
 .st.add{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
 .st.out{color:var(--muted);text-decoration:line-through}
 .cg.mg .chip{height:32px}
+.chip.nod{color:var(--muted);border-style:dashed}
+.fmode{display:flex;justify-content:space-between;align-items:center;gap:8px}.fmode .tg button{padding:5px 12px;font-size:12.5px}
 .ret{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .ret .b{padding:14px 16px;border:1px solid var(--line);border-radius:14px}
 .ret .b .n{font-size:26px;font-weight:700}.ret .b .n small{font-size:13px;font-weight:500;color:var(--ink2);margin-left:3px}
@@ -94,8 +111,9 @@ tr.grp th{background:var(--sunk);color:var(--ink2);font-size:12px}
     <details class="fcard" open>
       <summary>조회 조건 <span id="f-sum"></span></summary>
       <div class="fgrid">
+        <div class="fmode"><span class="fl">선택 방식</span><div class="tg" id="sel-mode"><button data-mode="1">단일 선택</button><button data-mode="n">다중 선택</button></div></div>
         <div class="fs"><span class="fl">연도</span><div class="cg" id="y-chips"></div></div>
-        <div class="fs"><span class="fl">분기</span><div class="cg" id="q-chips"></div></div>
+        <div class="fs"><span class="fl">분기</span><div class="cg mg" id="q-chips"></div></div>
         <div class="fs"><span class="fl">기준월</span>
           <div class="cg"><button class="chip" id="m-all" aria-pressed="true">전체</button></div>
           <div class="cg mg" id="m-chips"></div></div>
@@ -161,7 +179,10 @@ const PAGES = [
 ];
 
 /* ---------- 상태 ---------- */
-const S = {page:'p1', months:new Set(MONTHS), groups:new Set(), units:new Set(), eds:new Set(), subOnly:false, ed:null, cohorts:COHORTS.slice(-4), nCohort:COHORTS[COHORTS.length-1], nDept:'', bizMonth:BMS[BMS.length-1]};
+const YEARS=[...new Set(MONTHS.map(m=>m.slice(0,4)))];
+const CAL=YEARS.flatMap(y=>Array.from({length:12},(_,i)=>y+'-'+String(i+1).padStart(2,'0'))); /* 자료가 없어도 1~12월 모두 */
+const HAS=new Set(MONTHS);
+const S = {page:'p1', multi:false, months:new Set(CAL), groups:new Set(), units:new Set(), eds:new Set(), subOnly:false, ed:null, cohorts:COHORTS.slice(-4), nCohort:COHORTS[COHORTS.length-1], nDept:'', bizMonth:BMS[BMS.length-1]};
 const selMonths = () => MONTHS.filter(m=>S.months.has(m));
 /* 조회 조건을 적용한 교육 기록(R). 간호단위를 고르면 교육대상자 부서로 걸러지고, 부서라운딩은 부서별 구분이 없어 빠진다 */
 const R = {recs:[], rounds:[], all:[], unitOn:false};
@@ -185,22 +206,33 @@ if(innerWidth<=820) document.querySelector('.fcard').removeAttribute('open');
 nav.onclick = e => { const b=e.target.closest('[data-p]'); if(b) location.hash=b.dataset.p; };
 window.addEventListener('hashchange', route);
 const mc = document.getElementById('m-chips');
-const YEARS=[...new Set(MONTHS.map(m=>m.slice(0,4)))];
 const QOF=m=>Math.ceil(+m.slice(5)/3);
-const QUARTERS=[...new Set(MONTHS.map(m=>m.slice(0,4)+'-Q'+QOF(m)))];
+const QUARTERS=YEARS.flatMap(y=>[1,2,3,4].map(q=>y+'-Q'+q));
+const qMonths=q=>CAL.filter(m=>m.slice(0,4)+'-Q'+QOF(m)===q), yMonths=y=>CAL.filter(m=>m.startsWith(y));
+const isAll=()=>sameSet(S.months,new Set(CAL));
 const sameSet=(a,b)=>a.size===b.size&&[...a].every(x=>b.has(x));
 document.getElementById('y-chips').innerHTML=YEARS.map(y=>`<button class="chip" data-y="${y}">${y}년</button>`).join('');
-document.getElementById('q-chips').innerHTML=QUARTERS.map(q=>`<button class="chip" data-q="${q}">${+q.slice(-1)}분기</button>`).join('');
-mc.innerHTML = MONTHS.map(m=>`<button class="chip" data-m="${m}">${ml(m)}</button>`).join('');
+document.getElementById('q-chips').innerHTML=QUARTERS.map(q=>{const nd=!qMonths(q).some(m=>HAS.has(m));return `<button class="chip${nd?' nod':''}" data-q="${q}"${nd?' title="자료 없음"':''}>${+q.slice(-1)}분기</button>`;}).join('');
+mc.innerHTML = CAL.map(m=>`<button class="chip${HAS.has(m)?'':' nod'}" data-m="${m}"${HAS.has(m)?'':' title="자료 없음"'}>${ml(m)}</button>`).join('');
+document.getElementById('sel-mode').onclick=e=>{ const b=e.target.closest('[data-mode]'); if(!b||b.disabled) return; S.multi=b.dataset.mode==='n';
+  if(!S.multi){ if(S.groups.size>1) S.groups=new Set([[...S.groups][0]]); if(S.units.size>1) S.units=new Set([[...S.units][0]]); if(S.eds.size>1) S.eds=new Set([[...S.eds][0]]); }
+  render(); };
+/* 기간 칩: 단일 = 누른 것만(다시 누르면 전체), 다중 = 켜고 끄기 */
+function pickPeriod(ms){
+  const all=isAll(), on=ms.every(m=>S.months.has(m));
+  if(!S.multi){ S.months = (!all&&sameSet(S.months,new Set(ms))) ? new Set(CAL) : new Set(ms); return; }
+  if(all){ S.months=new Set(ms); return; }
+  if(on) ms.forEach(m=>S.months.delete(m)); else ms.forEach(m=>S.months.add(m));
+  if(!S.months.size) S.months=new Set(CAL);
+}
 document.getElementById('g-chips').innerHTML=UNIT_GROUPS.map(g=>`<button class="chip" data-g="${g[0]}"><span class="sw" style="--cc:var(${GROUP_C[g[0]]})"></span>${g[0]}</button>`).join('');
 document.querySelector('.fcard').addEventListener('click', e=>{
   const b=e.target.closest('.chip'); if(!b||b.disabled) return;
-  if(b.dataset.y){ const ms=new Set(MONTHS.filter(m=>m.startsWith(b.dataset.y))); S.months=sameSet(S.months,ms)&&YEARS.length>1?new Set(MONTHS):ms; }
-  else if(b.dataset.q){ const ms=new Set(MONTHS.filter(m=>m.slice(0,4)+'-Q'+QOF(m)===b.dataset.q)); S.months=sameSet(S.months,ms)?new Set(MONTHS):ms; }
-  else if(b.dataset.m){ const m=b.dataset.m;
-    if(S.months.size===MONTHS.length){ S.months=new Set([m]); } else if(S.months.has(m)){ S.months.delete(m); if(!S.months.size) S.months=new Set(MONTHS); } else S.months.add(m); }
-  else if(b.id==='m-all'){ S.months=new Set(MONTHS); }
-  else if(b.dataset.g){ const g=b.dataset.g; S.groups.has(g)?S.groups.delete(g):S.groups.add(g); }
+  if(b.dataset.y){ if(YEARS.length===1){ S.months=new Set(CAL); } else pickPeriod(yMonths(b.dataset.y)); }
+  else if(b.dataset.q){ pickPeriod(qMonths(b.dataset.q)); }
+  else if(b.dataset.m){ pickPeriod([b.dataset.m]); }
+  else if(b.id==='m-all'){ S.months=new Set(CAL); }
+  else if(b.dataset.g){ const g=b.dataset.g; if(S.multi){ S.groups.has(g)?S.groups.delete(g):S.groups.add(g); } else { const had=S.groups.has(g)&&S.groups.size===1; S.groups.clear(); if(!had) S.groups.add(g); } }
   else return;
   render();
 });
@@ -213,32 +245,33 @@ function multi(id, items, set, allLabel){
     ${items.map(it=>it.head?`<div class="fl" style="padding:6px 10px 2px">${esc(it.head)}</div>`:`<label class="mso"><input type="checkbox" value="${esc(it.v)}" ${set.has(it.v)?'checked':''}>${esc(it.label||it.v)}</label>`).join('')}</div>`;
   const btn=wrap.querySelector('.msb'), pan=wrap.querySelector('.msp');
   btn.onclick=()=>{ const open=pan.hidden; document.querySelectorAll('.msp').forEach(x=>{x.hidden=true;x.previousElementSibling.setAttribute('aria-expanded','false');}); pan.hidden=!open; btn.setAttribute('aria-expanded',open); };
-  pan.onchange=e=>{ const c=e.target; if(c.dataset.all!==undefined){ set.clear(); } else { c.checked?set.add(c.value):set.delete(c.value); } render(); setTimeout(()=>{ const w=document.getElementById(id); w.querySelector('.msp').hidden=false; w.querySelector('.msb').setAttribute('aria-expanded','true'); },0); };
+  pan.onchange=e=>{ const c=e.target; if(c.dataset.all!==undefined){ set.clear(); } else if(!S.multi){ set.clear(); if(c.checked) set.add(c.value); } else { c.checked?set.add(c.value):set.delete(c.value); } render(); if(!S.multi) return; setTimeout(()=>{ const w=document.getElementById(id); w.querySelector('.msp').hidden=false; w.querySelector('.msb').setAttribute('aria-expanded','true'); },0); };
 }
 document.addEventListener('click',e=>{ if(!e.target.closest('.ms-wrap')) document.querySelectorAll('.msp').forEach(x=>{x.hidden=true;x.previousElementSibling.setAttribute('aria-expanded','false');}); });
 const UNIT_ITEMS=(()=>{ const present=new Set(roster.map(r=>deptName(r.dept))); const out=[];
   UNIT_GROUPS.forEach(([g,us])=>{ const u=us.filter(x=>present.has(x)); if(u.length){ out.push({head:g}); u.forEach(x=>out.push({v:x})); } });
   const etc=[...present].filter(x=>!GROUP_OF[x]).sort(); if(etc.length){ out.push({head:'기타'}); etc.forEach(x=>out.push({v:x})); }
   return out; })();
-document.getElementById('f-reset').onclick = ()=>{ S.months=new Set(MONTHS); S.groups.clear(); S.units.clear(); S.eds.clear(); S.cohorts=COHORTS.slice(-4); S.ed=null; render(); };
+document.getElementById('f-reset').onclick = ()=>{ S.months=new Set(CAL); S.groups.clear(); S.units.clear(); S.eds.clear(); S.cohorts=COHORTS.slice(-4); S.ed=null; render(); };
 function syncFilter(page){
-  const all=S.months.size===MONTHS.length, ms=selMonths();
+  const all=isAll(), ms=selMonths();
+  document.querySelectorAll('#sel-mode [data-mode]').forEach(b=>b.setAttribute('aria-pressed',(b.dataset.mode==='n')===S.multi));
   document.getElementById('m-all').setAttribute('aria-pressed',all);
   mc.querySelectorAll('[data-m]').forEach(b=>b.setAttribute('aria-pressed',!all&&S.months.has(b.dataset.m)));
-  document.querySelectorAll('#y-chips [data-y]').forEach(b=>b.setAttribute('aria-pressed',sameSet(S.months,new Set(MONTHS.filter(m=>m.startsWith(b.dataset.y))))));
-  document.querySelectorAll('#q-chips [data-q]').forEach(b=>b.setAttribute('aria-pressed',sameSet(S.months,new Set(MONTHS.filter(m=>m.slice(0,4)+'-Q'+QOF(m)===b.dataset.q)))));
+  document.querySelectorAll('#y-chips [data-y]').forEach(b=>b.setAttribute('aria-pressed',yMonths(b.dataset.y).every(m=>S.months.has(m))));
+  document.querySelectorAll('#q-chips [data-q]').forEach(b=>b.setAttribute('aria-pressed',!all&&qMonths(b.dataset.q).every(m=>S.months.has(m))));
   document.querySelectorAll('#g-chips [data-g]').forEach(b=>b.setAttribute('aria-pressed',S.groups.has(b.dataset.g)));
   multi('u-ms', UNIT_ITEMS, S.units, '전체 부서');
   multi('e-ms', EDS.map(e=>({v:e})), S.eds, '전체 교육간호사');
-  document.querySelectorAll('.fcard .chip').forEach(b=>b.disabled=!page.period);
+  document.querySelectorAll('.fcard .chip, #sel-mode button').forEach(b=>b.disabled=!page.period);
   document.querySelectorAll('.fcard .msb').forEach(b=>b.disabled=!page.period);
   const parts=[];
-  parts.push(all?`${YEARS.join('·')}년 ${ml(MONTHS[0])}~${ml(MONTHS[MONTHS.length-1])}`:ms.map(ml).join(', '));
+  parts.push(all?`${YEARS.join('·')}년 전체`:CAL.filter(m=>S.months.has(m)).map(ml).join(', '));
   if(S.groups.size) parts.push([...S.groups].join('·'));
   if(S.units.size) parts.push([...S.units].join('·'));
   if(S.eds.size) parts.push('교육간호사 '+(S.eds.size<=2?[...S.eds].join('·'):S.eds.size+'명'));
   document.getElementById('f-sum').textContent = page.period ? parts.join(' · ') : '이 페이지는 적용 안 됨';
-  document.getElementById('f-hint').textContent = page.period ? '연도·분기·월은 하나를 누르면 그 기간만, 월은 여러 개를 함께 고를 수 있어요. 간호단위는 교육대상자(신규명단) 부서 기준이고, 부서군과 세부부서를 함께 고르면 둘 중 하나에 해당하면 포함해요.' : '이 페이지는 조회 조건을 쓰지 않고 페이지 안에서 기준월을 고릅니다.';
+  document.getElementById('f-hint').textContent = page.period ? (S.multi?'다중 선택: 누를 때마다 켜고 꺼져서 여러 분기·월·부서군·부서를 함께 볼 수 있어요. ':'단일 선택: 누른 하나만 보여요(다시 누르면 전체). ')+'점선 칩은 아직 자료가 없는 기간이에요. 간호단위는 교육대상자(신규명단) 부서 기준이고, 부서군과 세부부서를 함께 고르면 둘 중 하나에 해당하면 포함해요.' : '이 페이지는 조회 조건을 쓰지 않고 페이지 안에서 기준월을 고릅니다.';
 }
 
 /* ---------- 말풍선 ---------- */
@@ -600,7 +633,8 @@ function render(){
   const main=document.getElementById('main');
   main.innerHTML=phdr(page)+`<div class="head"><h1>${esc(page.name)}</h1><p>${esc(page.desc)}</p></div>`+
     (page.period&&R.unitOn?`<div class="callout">간호단위(${esc([...S.groups,...S.units].join(', '))})를 골라 교육대상자 부서로 걸렀어요. 부서라운딩은 부서별로 나뉘지 않아 이 조건에서는 빠지고, 신규명단에 없는 인원('명단 외')도 빠져요.</div>`:'');
-  ({p1,p2,p3,p4,p5})[S.page](main);
+  if(page.period&&!selMonths().length){ main.insertAdjacentHTML('beforeend',`<div class="card"><p class="note">선택한 기간(${esc(CAL.filter(m=>S.months.has(m)).map(ml).join(', '))})에는 아직 보고 자료가 없어요. 자료가 있는 기간은 ${esc(ml(MONTHS[0]))}~${esc(ml(MONTHS[MONTHS.length-1]))}입니다.</p></div>`); }
+  else ({p1,p2,p3,p4,p5})[S.page](main);
   document.title=page.name+' · 간호교육팀 운영 대시보드';
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);
