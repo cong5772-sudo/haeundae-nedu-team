@@ -46,6 +46,8 @@
 .hd-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
 .hd-row select{height:34px;border:1px solid var(--line2);border-radius:10px;background:var(--surface);color:var(--ink);padding:0 10px;font-size:13px}
 .nm-s{display:none}
+tr.sub th,tr.sub td{font-weight:700;border-top:1px solid var(--line2)}
+tr.grp th{background:var(--sunk);color:var(--ink2);font-size:12px}
 @media (max-width:1100px){.bizcards{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:820px){.nm-f{display:none}.nm-s{display:inline}}
 </style>
@@ -83,9 +85,14 @@
     <details class="fcard" open>
       <summary>조회 조건 <span id="f-sum"></span></summary>
       <div class="fgrid">
+        <div class="fs"><span class="fl">연도</span><div class="cg" id="y-chips"></div></div>
+        <div class="fs"><span class="fl">분기</span><div class="cg" id="q-chips"></div></div>
         <div class="fs"><span class="fl">기준월</span>
           <div class="cg"><button class="chip" id="m-all" aria-pressed="true">전체</button></div>
           <div class="cg mg" id="m-chips"></div></div>
+        <div class="fs"><span class="fl">간호단위 (부서군)</span><div class="cg" id="g-chips"></div></div>
+        <div class="fs"><span class="fl">세부부서</span><div class="ms-wrap" id="u-ms"></div></div>
+        <div class="fs"><span class="fl">교육간호사</span><div class="ms-wrap" id="e-ms"></div></div>
         <p class="fhint" id="f-hint"></p>
         <button class="freset" id="f-reset">조회 조건 초기화</button>
       </div>
@@ -113,8 +120,19 @@ const EDS = [...new Set(D.rounds.map(r=>r[1]))].sort((a,b)=>a.localeCompare(b,'k
 const kOf = (rid,m)=>{const s=roster[rid].start;return (+m.slice(0,4)-+s.slice(0,4))*12+(+m.slice(5,7)-+s.slice(5,7))+1;};
 const cohortOf = rid => roster[rid].start.slice(0,7);
 const cohortName = c => `${c.slice(2,4)}년 ${+c.slice(5)}월 발령`;
-const nurseRecs = D.recs.filter(x=>x[5]!=null);
-const COHORTS = [...new Set(nurseRecs.map(x=>cohortOf(x[5])))].sort();
+const nurseAll = D.recs.filter(x=>x[5]!=null);
+const COHORTS = [...new Set(nurseAll.map(x=>cohortOf(x[5])))].sort();
+/* 부서군(신규간호사 발령 유지관리 시스템 발령현황 기준) */
+const UNIT_GROUPS=[['일반병동',['12A','12B','11B','10A','10B','8A','8B','7B','6A']],['통합병동',['14A','14B','13A','13B','11A','9A','9B','7A']],['중환자',['MICU','SICU','EICU','NICU','MFICU']],['수술회복',['수술실','회복실']],['응급',['응급실']]];
+const GROUP_OF={}; UNIT_GROUPS.forEach(([g,us])=>us.forEach(u=>GROUP_OF[u]=g));
+const GROUP_C={'일반병동':'--c-REG','통합병동':'--c-DED','중환자':'--c-PTL','수술회복':'--c-MOV','응급':'--c-SEN','기타':'--c-SPC','명단 외':'--c-TOP'};
+const GROUP_ORDER=UNIT_GROUPS.map(g=>g[0]).concat(['기타','명단 외']);
+const DEPT_ALIAS={'OR':'수술실','ER':'응급실','RCR':'회복실'};
+const deptName=d=>DEPT_ALIAS[d]||d;
+const deptOf=x=>x[5]!=null?deptName(roster[x[5]].dept):'명단 외';
+const groupOfDept=d=>d==='명단 외'?'명단 외':(GROUP_OF[d]||'기타');
+const groupOf=x=>groupOfDept(deptOf(x));
+const unitRank=d=>{const g=GROUP_ORDER.indexOf(groupOfDept(d));const us=(UNIT_GROUPS.find(x=>x[0]===groupOfDept(d))||[0,[]])[1];const i=us.indexOf(d);return g*100+(i<0?99:i);};
 const BIZ = Object.keys(D.bizStd);
 const BIZ_SHORT = {'간호간병 교육전담간호사 지원사업':'통합','간호사 교대제 개선 시범사업':'교대제','필수의료간호사 양성지원사업':'필수'};
 const BIZ_C = {'간호간병 교육전담간호사 지원사업':'--c-B1','간호사 교대제 개선 시범사업':'--c-B2','필수의료간호사 양성지원사업':'--c-B3'};
@@ -130,8 +148,19 @@ const PAGES = [
 ];
 
 /* ---------- 상태 ---------- */
-const S = {page:'p1', months:new Set(MONTHS), ed:null, cohorts:COHORTS.slice(-4), nCohort:COHORTS[COHORTS.length-1], nDept:'', bizMonth:BMS[BMS.length-1]};
+const S = {page:'p1', months:new Set(MONTHS), groups:new Set(), units:new Set(), eds:new Set(), subOnly:false, ed:null, cohorts:COHORTS.slice(-4), nCohort:COHORTS[COHORTS.length-1], nDept:'', bizMonth:BMS[BMS.length-1]};
 const selMonths = () => MONTHS.filter(m=>S.months.has(m));
+/* 조회 조건을 적용한 교육 기록(R). 간호단위를 고르면 교육대상자 부서로 걸러지고, 부서라운딩은 부서별 구분이 없어 빠진다 */
+const R = {recs:[], rounds:[], all:[], unitOn:false};
+const unitOn = () => S.groups.size>0 || S.units.size>0;
+const unitOk = x => !unitOn() || S.units.has(deptOf(x)) || S.groups.has(groupOf(x));
+const edOk = e => !S.eds.size || S.eds.has(e);
+function applyFilter(){
+  R.unitOn = unitOn();
+  R.all = D.recs.filter(x=>edOk(x[1]) && unitOk(x));
+  R.recs = R.all.filter(x=>S.months.has(x[0]));
+  R.rounds = R.unitOn ? [] : D.rounds.filter(x=>S.months.has(x[0]) && edOk(x[1]));
+}
 
 /* ---------- 상단·메뉴·조회조건 ---------- */
 document.getElementById('asof').textContent = D.updated;
@@ -143,20 +172,60 @@ if(innerWidth<=820) document.querySelector('.fcard').removeAttribute('open');
 nav.onclick = e => { const b=e.target.closest('[data-p]'); if(b) location.hash=b.dataset.p; };
 window.addEventListener('hashchange', route);
 const mc = document.getElementById('m-chips');
+const YEARS=[...new Set(MONTHS.map(m=>m.slice(0,4)))];
+const QOF=m=>Math.ceil(+m.slice(5)/3);
+const QUARTERS=[...new Set(MONTHS.map(m=>m.slice(0,4)+'-Q'+QOF(m)))];
+const sameSet=(a,b)=>a.size===b.size&&[...a].every(x=>b.has(x));
+document.getElementById('y-chips').innerHTML=YEARS.map(y=>`<button class="chip" data-y="${y}">${y}년</button>`).join('');
+document.getElementById('q-chips').innerHTML=QUARTERS.map(q=>`<button class="chip" data-q="${q}">${+q.slice(-1)}분기</button>`).join('');
 mc.innerHTML = MONTHS.map(m=>`<button class="chip" data-m="${m}">${ml(m)}</button>`).join('');
-mc.onclick = e => { const b=e.target.closest('[data-m]'); if(!b) return; const m=b.dataset.m;
-  if(S.months.size===MONTHS.length){ S.months=new Set([m]); } else if(S.months.has(m)){ S.months.delete(m); if(!S.months.size) S.months=new Set(MONTHS); } else S.months.add(m);
-  render(); };
-document.getElementById('m-all').onclick = ()=>{ S.months=new Set(MONTHS); render(); };
-document.getElementById('f-reset').onclick = ()=>{ S.months=new Set(MONTHS); S.cohorts=COHORTS.slice(-4); S.ed=null; render(); };
+document.getElementById('g-chips').innerHTML=UNIT_GROUPS.map(g=>`<button class="chip" data-g="${g[0]}"><span class="sw" style="--cc:var(${GROUP_C[g[0]]})"></span>${g[0]}</button>`).join('');
+document.querySelector('.fcard').addEventListener('click', e=>{
+  const b=e.target.closest('.chip'); if(!b||b.disabled) return;
+  if(b.dataset.y){ const ms=new Set(MONTHS.filter(m=>m.startsWith(b.dataset.y))); S.months=sameSet(S.months,ms)&&YEARS.length>1?new Set(MONTHS):ms; }
+  else if(b.dataset.q){ const ms=new Set(MONTHS.filter(m=>m.slice(0,4)+'-Q'+QOF(m)===b.dataset.q)); S.months=sameSet(S.months,ms)?new Set(MONTHS):ms; }
+  else if(b.dataset.m){ const m=b.dataset.m;
+    if(S.months.size===MONTHS.length){ S.months=new Set([m]); } else if(S.months.has(m)){ S.months.delete(m); if(!S.months.size) S.months=new Set(MONTHS); } else S.months.add(m); }
+  else if(b.id==='m-all'){ S.months=new Set(MONTHS); }
+  else if(b.dataset.g){ const g=b.dataset.g; S.groups.has(g)?S.groups.delete(g):S.groups.add(g); }
+  else return;
+  render();
+});
+/* 여러 개 고르기(드롭다운) */
+function multi(id, items, set, allLabel){
+  const wrap=document.getElementById(id);
+  const sum=()=>set.size?(set.size<=2?[...set].join(', '):`${[...set].slice(0,2).join(', ')} 외 ${set.size-2}`):allLabel;
+  wrap.innerHTML=`<button type="button" class="msb" aria-expanded="false"><span>${esc(sum())}</span><i>▾</i></button><div class="msp" hidden>
+    <label class="mso"><input type="checkbox" data-all ${set.size?'':'checked'}>${esc(allLabel)}</label>
+    ${items.map(it=>it.head?`<div class="fl" style="padding:6px 10px 2px">${esc(it.head)}</div>`:`<label class="mso"><input type="checkbox" value="${esc(it.v)}" ${set.has(it.v)?'checked':''}>${esc(it.label||it.v)}</label>`).join('')}</div>`;
+  const btn=wrap.querySelector('.msb'), pan=wrap.querySelector('.msp');
+  btn.onclick=()=>{ const open=pan.hidden; document.querySelectorAll('.msp').forEach(x=>{x.hidden=true;x.previousElementSibling.setAttribute('aria-expanded','false');}); pan.hidden=!open; btn.setAttribute('aria-expanded',open); };
+  pan.onchange=e=>{ const c=e.target; if(c.dataset.all!==undefined){ set.clear(); } else { c.checked?set.add(c.value):set.delete(c.value); } render(); setTimeout(()=>{ const w=document.getElementById(id); w.querySelector('.msp').hidden=false; w.querySelector('.msb').setAttribute('aria-expanded','true'); },0); };
+}
+document.addEventListener('click',e=>{ if(!e.target.closest('.ms-wrap')) document.querySelectorAll('.msp').forEach(x=>{x.hidden=true;x.previousElementSibling.setAttribute('aria-expanded','false');}); });
+const UNIT_ITEMS=(()=>{ const present=new Set(roster.map(r=>deptName(r.dept))); const out=[];
+  UNIT_GROUPS.forEach(([g,us])=>{ const u=us.filter(x=>present.has(x)); if(u.length){ out.push({head:g}); u.forEach(x=>out.push({v:x})); } });
+  const etc=[...present].filter(x=>!GROUP_OF[x]).sort(); if(etc.length){ out.push({head:'기타'}); etc.forEach(x=>out.push({v:x})); }
+  return out; })();
+document.getElementById('f-reset').onclick = ()=>{ S.months=new Set(MONTHS); S.groups.clear(); S.units.clear(); S.eds.clear(); S.cohorts=COHORTS.slice(-4); S.ed=null; render(); };
 function syncFilter(page){
   const all=S.months.size===MONTHS.length, ms=selMonths();
   document.getElementById('m-all').setAttribute('aria-pressed',all);
   mc.querySelectorAll('[data-m]').forEach(b=>b.setAttribute('aria-pressed',!all&&S.months.has(b.dataset.m)));
-  mc.querySelectorAll('.chip').forEach(b=>b.disabled=!page.period);
-  document.getElementById('m-all').disabled=!page.period;
-  document.getElementById('f-sum').textContent = page.period ? (all?`2026년 ${ml(MONTHS[0])}~${ml(MONTHS[MONTHS.length-1])}`:ms.map(ml).join(', ')) : '이 페이지는 적용 안 됨';
-  document.getElementById('f-hint').textContent = page.period ? '월을 누르면 그 달만 보고, 여러 달을 함께 고를 수 있어요.' : '이 페이지는 조회 조건을 쓰지 않고 페이지 안에서 기준월을 고릅니다.';
+  document.querySelectorAll('#y-chips [data-y]').forEach(b=>b.setAttribute('aria-pressed',sameSet(S.months,new Set(MONTHS.filter(m=>m.startsWith(b.dataset.y))))));
+  document.querySelectorAll('#q-chips [data-q]').forEach(b=>b.setAttribute('aria-pressed',sameSet(S.months,new Set(MONTHS.filter(m=>m.slice(0,4)+'-Q'+QOF(m)===b.dataset.q)))));
+  document.querySelectorAll('#g-chips [data-g]').forEach(b=>b.setAttribute('aria-pressed',S.groups.has(b.dataset.g)));
+  multi('u-ms', UNIT_ITEMS, S.units, '전체 부서');
+  multi('e-ms', EDS.map(e=>({v:e})), S.eds, '전체 교육간호사');
+  document.querySelectorAll('.fcard .chip').forEach(b=>b.disabled=!page.period);
+  document.querySelectorAll('.fcard .msb').forEach(b=>b.disabled=!page.period);
+  const parts=[];
+  parts.push(all?`${YEARS.join('·')}년 ${ml(MONTHS[0])}~${ml(MONTHS[MONTHS.length-1])}`:ms.map(ml).join(', '));
+  if(S.groups.size) parts.push([...S.groups].join('·'));
+  if(S.units.size) parts.push([...S.units].join('·'));
+  if(S.eds.size) parts.push('교육간호사 '+(S.eds.size<=2?[...S.eds].join('·'):S.eds.size+'명'));
+  document.getElementById('f-sum').textContent = page.period ? parts.join(' · ') : '이 페이지는 적용 안 됨';
+  document.getElementById('f-hint').textContent = page.period ? '연도·분기·월은 하나를 누르면 그 기간만, 월은 여러 개를 함께 고를 수 있어요. 간호단위는 교육대상자(신규명단) 부서 기준이고, 부서군과 세부부서를 함께 고르면 둘 중 하나에 해당하면 포함해요.' : '이 페이지는 조회 조건을 쓰지 않고 페이지 안에서 기준월을 고릅니다.';
 }
 
 /* ---------- 말풍선 ---------- */
@@ -218,10 +287,11 @@ const legend = (items,avg) => `<div class="legend">${items.map(([c,n])=>`<span><
 
 /* ---------- 집계 ---------- */
 function monthAgg(m){
-  const r=D.recs.filter(x=>x[0]===m), rd=D.rounds.filter(x=>x[0]===m);
+  const r=R.recs.filter(x=>x[0]===m), rd=R.rounds.filter(x=>x[0]===m);
   const hy=r.reduce((a,x)=>a+x[4],0), rn=rd.reduce((a,x)=>a+x[2],0);
+  const reps=D.rounds.filter(x=>x[0]===m&&edOk(x[1])).length;
   const ppl=t=>new Set(r.filter(x=>stage(x)===t).map(x=>x[5]!=null?'r'+x[5]:x[2])).size;
-  const o={m,hy,rn,tot:hy+rn,n1:ppl('N1'),n2:ppl('N2'),nr:ppl('RN'),mv:ppl('MV'),eds:rd.length};
+  const o={m,hy,rn,tot:hy+rn,n1:ppl('N1'),n2:ppl('N2'),nr:ppl('RN'),mv:ppl('MV'),eds:reps};
   o.pp=o.n1+o.n2+o.nr+o.mv; return o;
 }
 /* 교육대상자 구분: 신규간호사 Ⅰ = 발령 1~6개월, Ⅱ = 7~12개월, 이후 간호사. 부서이동자는 따로 */
@@ -231,12 +301,11 @@ function stage(x){
   return x[3]==='신규'?'N1':'RN';
 }
 const STAGES=[['N1','신규간호사 Ⅰ','--c-N1','발령 1~6개월'],['N2','신규간호사 Ⅱ','--c-N2','발령 7~12개월'],['RN','간호사','--c-RN','발령 13개월 이후·재직간호사'],['MV','부서이동자','--c-MV','']];
-const DEPT_ALIAS={'수술실':'OR','응급실':'ER','회복실':'RCR'};
-const deptOf=x=>x[5]!=null?(DEPT_ALIAS[roster[x[5]].dept]||roster[x[5]].dept):'명단 외';
 function edAgg(ed,ms){
-  const r=D.recs.filter(x=>x[1]===ed&&ms.includes(x[0])), rd=D.rounds.filter(x=>x[1]===ed&&ms.includes(x[0]));
+  const r=R.recs.filter(x=>x[1]===ed&&ms.includes(x[0])), rd=R.rounds.filter(x=>x[1]===ed&&ms.includes(x[0]));
   const hy=r.reduce((a,x)=>a+x[4],0), rn=rd.reduce((a,x)=>a+x[2],0);
-  return {ed,hy,rn,tot:hy+rn,ppl:new Set(r.map(x=>x[5]!=null?'r'+x[5]:x[2])).size,reports:rd.length};
+  const reports=D.rounds.filter(x=>x[1]===ed&&ms.includes(x[0])).length;
+  return {ed,hy,rn,tot:hy+rn,ppl:new Set(r.map(x=>x[5]!=null?'r'+x[5]:x[2])).size,reports};
 }
 
 /* ---------- 출력 버튼 ---------- */
@@ -265,16 +334,23 @@ function p1(main){
   const sumOf=k=>A.reduce((a,x)=>a+x[k],0);
   const SK={N1:'n1',N2:'n2',RN:'nr',MV:'mv'};
   // 부서별 현장교육(신규명단 부서 기준, 부서라운딩 제외)
-  const recs=D.recs.filter(x=>ms.includes(x[0]));
-  const dmap={}; recs.forEach(x=>{const d=deptOf(x);const o=(dmap[d]=dmap[d]||{d,by:{},tot:0,ppl:new Set()});o.by[x[0]]=(o.by[x[0]]||0)+x[4];o.tot+=x[4];o.ppl.add(x[5]!=null?'r'+x[5]:x[2]);});
-  const DL=Object.values(dmap).sort((a,b)=>(a.d==='명단 외')-(b.d==='명단 외')||a.d.localeCompare(b.d,'ko',{numeric:true}));
-  const DR=DL.slice().sort((a,b)=>b.tot-a.tot);
+  const recs=R.recs;
+  const pk=x=>x[5]!=null?'r'+x[5]:x[2];
+  const dmap={}, gmap={};
+  recs.forEach(x=>{const d=deptOf(x), g=groupOfDept(d);
+    const o=(dmap[d]=dmap[d]||{d,g,by:{},tot:0,ppl:new Set()}); o.by[x[0]]=(o.by[x[0]]||0)+x[4]; o.tot+=x[4]; o.ppl.add(pk(x));
+    const q=(gmap[g]=gmap[g]||{g,by:{},tot:0,ppl:new Set(),n:0}); q.by[x[0]]=(q.by[x[0]]||0)+x[4]; q.tot+=x[4]; q.ppl.add(pk(x)); });
+  Object.values(dmap).forEach(o=>gmap[o.g].n++);
+  const GL=GROUP_ORDER.filter(g=>gmap[g]).map(g=>gmap[g]);
+  const DL=Object.values(dmap).sort((a,b)=>unitRank(a.d)-unitRank(b.d)||a.d.localeCompare(b.d,'ko',{numeric:true}));
+  const row=(o,cls,label)=>`<tr class="${cls}"><th>${label}</th>${ms.map(m=>`<td class="num">${z(o.by[m]||0)}</td>`).join('')}<td class="num tot">${fmt(o.tot)}</td><td class="num">${o.ppl.size}</td><td class="num">${fmt(o.tot/o.ppl.size)}</td></tr>`;
+  const deptRows=GL.map(q=>(S.subOnly?'':`<tr class="grp"><th colspan="${ms.length+4}"><span class="kc" style="--cc:var(${GROUP_C[q.g]})"><i></i>${esc(q.g)}</span></th></tr>`+DL.filter(o=>o.g===q.g).map(o=>row(o,'','&nbsp;&nbsp;'+esc(o.d))).join(''))+row(q,'sub',esc(q.g)+(S.subOnly?'':' 소계')+` <span class="note" style="font-weight:500">${q.n}개 부서</span>`)).join('');
   main.insertAdjacentHTML('beforeend',`
   <div class="kpis">
     <div class="kpi"><div class="lab">총 교육시간</div><div class="val num">${fmt(tot)}<small>분</small></div><div class="sub">${fmtH(tot)}시간 · ${ms.length}개월</div></div>
     <div class="kpi"><div class="lab">월평균 교육시간</div><div class="val num">${fmt(tot/ms.length)}<small>분</small></div><div class="sub">${fmtH(tot/ms.length)}시간</div></div>
     <div class="kpi"><div class="lab">교육대상자 연인원</div><div class="val num">${fmt(pp)}<small>명</small></div><div class="sub">월평균 ${fmt(pp/ms.length)}명</div></div>
-    <div class="kpi"><div class="lab">부서라운딩 비율</div><div class="val num">${(tot?rn/tot*100:0).toFixed(1)}<small>%</small></div><div class="sub">라운딩 ${fmt(rn)}분 / 총 ${fmt(tot)}분</div></div>
+    <div class="kpi"><div class="lab">부서라운딩 비율</div><div class="val num">${R.unitOn?'–':(tot?rn/tot*100:0).toFixed(1)}<small>${R.unitOn?'':'%'}</small></div><div class="sub">${R.unitOn?'간호단위 선택 시 제외':`라운딩 ${fmt(rn)}분 / 총 ${fmt(tot)}분`}</div></div>
   </div>
   <div class="grid2" style="align-items:start">
     <section class="card"><h2>월별 교육시간</h2><p class="hint">단위 분. 막대 위 숫자는 총 교육시간, 점선은 조회 기간 월평균</p>${legend([['--c-HY','현장교육'],['--c-RD','부서라운딩']],'월평균')}<div class="chart-wrap" id="g1"></div></section>
@@ -287,23 +363,28 @@ function p1(main){
     <div class="tw" style="margin-top:10px"><table id="t1"><thead><tr><th>기준월</th><th>교육간호사</th>${STAGES.map(s=>`<th><span class="cdot" style="--cc:var(${s[2]})"></span>${s[1]}</th>`).join('')}<th><span class="cdot" style="--cc:var(--c-HY)"></span>현장교육(분)</th><th><span class="cdot" style="--cc:var(--c-RD)"></span>부서라운딩(분)</th><th class="tot">총 교육시간(분)</th></tr></thead>
     <tbody>${A.map(x=>`<tr><th>${ml(x.m)}</th><td class="num">${x.eds}</td>${STAGES.map(s=>`<td class="num">${z(x[SK[s[0]]])}</td>`).join('')}<td class="num">${fmt(x.hy)}</td><td class="num">${z(x.rn)}</td><td class="num tot">${fmt(x.tot)}</td></tr>`).join('')}</tbody>
     <tfoot><tr class="sum"><th>합계</th><td></td>${STAGES.map(s=>`<td class="num">${fmt(sumOf(SK[s[0]]))}</td>`).join('')}<td class="num">${fmt(hy)}</td><td class="num">${fmt(rn)}</td><td class="num tot">${fmt(tot)}</td></tr></tfoot></table></div></section>
-  <section class="card">${tools('부서별 교육현황','현장교육시간만 집계(부서라운딩 제외). 부서는 신규명단의 부서, 명단에 없는 부서이동자·재직간호사는 \'명단 외\'로 묶음. 단위 분','t1c')}
+  <section class="card">${tools('부서군·세부부서별 교육현황','현장교육시간만 집계(부서라운딩 제외). 교육대상자의 신규명단 부서 기준이며, 명단에 없는 부서이동자·재직간호사는 명단 외로 묶어요. 단위 분','t1c')}
     <div class="grid2" style="margin-top:10px;align-items:start">
-      <div><p class="note" style="margin:0 0 6px">조회 기간 부서별 현장교육시간(분) · 많은 순</p><div class="chart-wrap" id="g1c"></div></div>
+      <div><p class="note" style="margin:0 0 6px">부서군별 월별 현장교육시간(분)</p>${legend(GL.map(q=>[GROUP_C[q.g],q.g]))}<div class="chart-wrap" id="g1d"></div>
+        <p class="note" style="margin:14px 0 6px">세부부서별 현장교육시간(분) · 많은 순</p><div class="chart-wrap" id="g1c"></div></div>
+      <div><div class="seg" style="margin-bottom:8px"><button class="chip" id="subonly" aria-pressed="${S.subOnly}">부서군 소계만 보기</button></div>
       <div class="tw"><table id="t1c"><thead><tr><th>부서</th>${ms.map(m=>`<th>${ml(m)}</th>`).join('')}<th class="tot">합계</th><th>교육대상자(명)</th><th>1인당(분)</th></tr></thead>
-      <tbody>${DL.map(o=>`<tr><th>${esc(o.d)}</th>${ms.map(m=>`<td class="num">${z(o.by[m]||0)}</td>`).join('')}<td class="num tot">${fmt(o.tot)}</td><td class="num">${o.ppl.size}</td><td class="num">${fmt(o.tot/o.ppl.size)}</td></tr>`).join('')}</tbody>
-      <tfoot><tr class="sum"><th>합계</th>${ms.map(m=>`<td class="num">${fmt(DL.reduce((a,o)=>a+(o.by[m]||0),0))}</td>`).join('')}<td class="num tot">${fmt(hy)}</td><td class="num">${new Set(recs.map(x=>x[5]!=null?'r'+x[5]:x[2])).size}</td><td></td></tr></tfoot></table></div>
+      <tbody>${deptRows}</tbody>
+      <tfoot><tr class="sum"><th>전체 (${DL.length}개 부서)</th>${ms.map(m=>`<td class="num">${fmt(DL.reduce((a,o)=>a+(o.by[m]||0),0))}</td>`).join('')}<td class="num tot">${fmt(hy)}</td><td class="num">${new Set(recs.map(pk)).size}</td><td class="num">${fmt(hy/Math.max(1,new Set(recs.map(pk)).size))}</td></tr></tfoot></table></div></div>
     </div></section>`);
+  document.getElementById('subonly').onclick=()=>{S.subOnly=!S.subOnly;render();};
   const fm=v=>fmt(v)+'분';
   vbar(document.getElementById('g1'),ms.map(ml),[{name:'현장교육',c:'--c-HY',values:A.map(x=>x.hy)},{name:'부서라운딩',c:'--c-RD',values:A.map(x=>x.rn)}],{ft:fm,avg:tot/ms.length,aria:'월별 교육시간(분)'});
   vbar(document.getElementById('g2'),ms.map(ml),STAGES.map(s=>({name:s[1],c:s[2],values:A.map(x=>x[SK[s[0]]])})),{ft:v=>fmt(v)+'명',aria:'월별 교육대상자 수'});
-  hbar(document.getElementById('g1c'),DR.map(o=>o.d),[{name:'현장교육',c:'--c-HY',values:DR.map(o=>o.tot)}],{rowH:22,L:62,ft:fm,aria:'부서별 현장교육시간'});
+  const DR=DL.slice().sort((a,b)=>b.tot-a.tot);
+  vbar(document.getElementById('g1d'),ms.map(ml),GL.map(q=>({name:q.g,c:GROUP_C[q.g],values:ms.map(m=>q.by[m]||0)})),{ft:fm,aria:'부서군별 월별 현장교육시간'});
+  hbar(document.getElementById('g1c'),DR.map(o=>o.d),[{name:'현장교육',c:'--c-HY',values:DR.map(o=>o.tot)}],{rowH:22,L:62,ft:fm,aria:'세부부서별 현장교육시간'});
 }
 
 /* ---------- 2. 교육간호사별 ---------- */
 function p2(main){
   const ms=selMonths();
-  const A=EDS.map(e=>edAgg(e,ms)).filter(a=>a.reports).sort((a,b)=>b.tot-a.tot);
+  const A=EDS.filter(edOk).map(e=>edAgg(e,ms)).filter(a=>a.reports&&(!R.unitOn||a.tot>0)).sort((a,b)=>b.tot-a.tot);
   if(!S.ed||!A.find(a=>a.ed===S.ed)) S.ed=A[0]&&A[0].ed;
   const sum=A.reduce((a,x)=>a+x.tot,0);
   main.insertAdjacentHTML('beforeend',`
@@ -326,7 +407,7 @@ function p2(main){
   document.querySelectorAll('#t2 tr[data-ed]').forEach(tr=>tr.onclick=()=>{S.ed=tr.dataset.ed;render();});
   // 상세
   const ed=S.ed; if(!ed) return; const a=edAgg(ed,ms);
-  const per={}; D.recs.filter(x=>x[1]===ed&&ms.includes(x[0])).forEach(x=>{const k=x[5]!=null?'r'+x[5]:x[2]+'|'+x[3];(per[k]=per[k]||{name:x[2],type:x[3],rid:x[5],min:0,mm:new Set()}).min+=x[4];per[k].mm.add(x[0]);});
+  const per={}; R.recs.filter(x=>x[1]===ed&&ms.includes(x[0])).forEach(x=>{const k=x[5]!=null?'r'+x[5]:x[2]+'|'+x[3];(per[k]=per[k]||{name:x[2],type:x[3],rid:x[5],min:0,mm:new Set()}).min+=x[4];per[k].mm.add(x[0]);});
   const list=Object.values(per).sort((p,q)=>q.min-p.min);
   const dp=D.dept.filter(d=>d[1]===ed&&ms.includes(d[0])).sort((p,q)=>p[0]<q[0]?1:-1)[0];
   const box=document.getElementById('edd');
@@ -342,7 +423,7 @@ function p2(main){
 
 /* ---------- 3. 현장교육 세부분석 ---------- */
 function p3(main){
-  const ms=selMonths();
+  const ms=selMonths(), nurseRecs=R.all.filter(x=>x[5]!=null);
   const cc=['--c-K1','--c-K2','--c-K3','--c-K4'];
   main.insertAdjacentHTML('beforeend',`
   <section class="card"><h2>발령 개월차별 1인당 평균 현장교육 시간</h2>
@@ -368,7 +449,7 @@ function p3(main){
   document.getElementById('kl').innerHTML=legend(series.map(s=>[s.c,s.name]));
   line(document.getElementById('g5'),[...Array(lastK)].map((_,j)=>String(j+1)),series,{aria:'발령 개월차별 평균 교육시간'});
   // 부서별
-  const dp={}; nurseRecs.filter(x=>ms.includes(x[0])).forEach(x=>{const d=roster[x[5]].dept;(dp[d]=dp[d]||{min:0,ids:new Set()}).min+=x[4];dp[d].ids.add(x[5]);});
+  const dp={}; nurseRecs.filter(x=>ms.includes(x[0])).forEach(x=>{const d=deptOf(x);(dp[d]=dp[d]||{min:0,ids:new Set()}).min+=x[4];dp[d].ids.add(x[5]);});
   const DA=Object.entries(dp).map(([d,v])=>({d,avg:v.min/v.ids.size,n:v.ids.size})).sort((a,b)=>b.avg-a.avg);
   hbar(document.getElementById('g6'),DA.map(x=>x.d),[{name:'1인당 평균',c:'--c-HY',values:DA.map(x=>Math.round(x.avg))}],{rowH:22,L:56,ft:v=>fmt(v)+'분',aria:'부서별 1인당 교육시간'});
   // 재직·사직
@@ -401,7 +482,7 @@ function p4(main){
   const alias={OR:['OR','수술실'],ER:['ER','응급실']}, uds=u=>alias[u]||[u], end=lm+'-31';
   const units=Object.keys(owner).sort((a,b)=>a.localeCompare(b,'ko',{numeric:true})).map(u=>{const ds=uds(u);
     return {u,own:owner[u],act:roster.filter(r=>ds.includes(r.dept)&&r.start<=end&&kOf(r.id,lm)<=12&&(!r.resign||r.resign>end)).length,
-      min:nurseRecs.filter(x=>x[0]===lm&&ds.includes(roster[x[5]].dept)).reduce((a,x)=>a+x[4],0)};});
+      min:nurseAll.filter(x=>x[0]===lm&&ds.includes(roster[x[5]].dept)).reduce((a,x)=>a+x[4],0)};});
   const changes=[];
   DMS.forEach((m,i)=>{ if(!i) return; const pm=DMS[i-1]; eds.forEach(e=>{const v=get(e,m),p=get(e,pm);
     if(v&&p&&norm(v)!==norm(p)){const a=v.split(',').map(x=>x.trim()),b=p.split(',').map(x=>x.trim());changes.push([m,e,a.filter(x=>!b.includes(x)),b.filter(x=>!a.includes(x)),'']);}
@@ -471,9 +552,11 @@ function render(){
   charts.length=0;
   const page=PAGES.find(p=>p.id===S.page);
   nav.querySelectorAll('.navbtn').forEach(b=>{ if(b.dataset.p===S.page) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
+  applyFilter();
   syncFilter(page);
   const main=document.getElementById('main');
-  main.innerHTML=phdr(page)+`<div class="head"><h1>${esc(page.name)}</h1><p>${esc(page.desc)}</p></div>`;
+  main.innerHTML=phdr(page)+`<div class="head"><h1>${esc(page.name)}</h1><p>${esc(page.desc)}</p></div>`+
+    (page.period&&R.unitOn?`<div class="callout">간호단위(${esc([...S.groups,...S.units].join(', '))})를 골라 교육대상자 부서로 걸렀어요. 부서라운딩은 부서별로 나뉘지 않아 이 조건에서는 빠지고, 신규명단에 없는 인원('명단 외')도 빠져요.</div>`:'');
   ({p1,p2,p3,p4,p5})[S.page](main);
   document.title=page.name+' · 간호교육팀 운영 대시보드';
 }
