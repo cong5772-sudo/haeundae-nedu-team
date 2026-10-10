@@ -86,6 +86,15 @@
 /* 나란히 놓인 카드: 표를 카드 아래쪽에 맞춰 두 표의 줄이 같은 높이에 오도록 */
 .grid2.eq{align-items:stretch}
 .eqcard{display:flex;flex-direction:column}
+.cmp3{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);gap:14px}
+@media (max-width:1100px){.cmp3{grid-template-columns:minmax(0,1fr)}}
+.cmpc{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--surface)}
+.cmpc .ct{font-size:14.5px}
+.peers{display:grid;gap:8px}
+.pr2{display:grid;grid-template-columns:minmax(70px,auto) minmax(0,1fr) 48px;gap:10px;align-items:center;font-size:13.5px}
+.pr2 .br{height:10px;border-radius:99px;background:var(--sunk);overflow:hidden}.pr2 .br i{display:block;height:100%;border-radius:99px}
+.pr2 b{text-align:right}.pr2.me .nm{font-weight:700;color:var(--accent)}
+.covn{font-size:34px;font-weight:700;line-height:1.1}.covn small{font-size:15px;font-weight:500;color:var(--ink2);margin-left:2px}
 /* 사직 표시: 눈에 띄되 튀지 않는 옅은 로즈 */
 .st.rsg{background:#f8eef0;border-color:#e6c9cf;color:#9a4458;font-weight:600}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .st.rsg{background:#2a1a1f;border-color:#5a3540;color:#e3a3b2}}
@@ -341,6 +350,20 @@ function vbar(el, labels, series, o){
   if(o.avg!=null){ const ya=y(o.avg); g+=`<line class="avg" x1="${L}" x2="${W-R+4}" y1="${ya}" y2="${ya}"/><text x="${W-R+8}" y="${ya-2}" style="fill:var(--muted)">평균</text><text x="${W-R+8}" y="${ya+11}" style="fill:var(--muted)">${o.ft?o.ft(o.avg):fmt(o.avg)}</text>`; }
   el.innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(o.aria||'')}">${g}</svg>`;
   if(o.click) el.querySelectorAll('.hit').forEach(h=>{ const i=+h.dataset.i; const tp=(o.clickTip||[])[i]; if(tp) h.dataset.tip=tp; h.addEventListener('click',()=>o.click(i)); });
+}
+function gbar(el, labels, series, o){
+  charts.push(()=>gbar(el,labels,series,o));
+  const W=Math.max(280,el.clientWidth), H=o.h||240, L=56, R=10, T=24, B=30;
+  const all=series.flatMap(s=>s.values.filter(v=>v!=null)); const ax=axis(Math.max(1,...all)), y=v=>T+(H-T-B)*(1-v/ax.max);
+  const step=(W-L-R)/labels.length, n=series.length, bw=Math.min(26,(step*.7)/n);
+  let g='';
+  for(let i=0;i<=ax.n;i++){ const v=ax.st*i, yy=y(v); g+=`<line class="grid" x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}"/><text x="${L-6}" y="${yy+4}" text-anchor="end">${fmt(v)}</text>`; }
+  labels.forEach((lb,i)=>{ const x0=L+step*i+(step-bw*n-2*(n-1))/2;
+    series.forEach((s,si)=>{ const v=s.values[i]; if(v==null) return; const x=x0+si*(bw+2), y1=y(v), y0=y(0);
+      if(v>0) g+=`<path class="bar" d="M${x},${y0} V${y1+3} q0,-3 3,-3 H${x+bw-3} q3,0 3,3 V${y0} Z" fill="var(${s.c})" data-tip="${esc(lb)} · ${esc(s.name)}: ${fmt(v)}${o.unit||''}${s.n?' ('+s.n[i]+')':''}"/>`;
+      g+=`<text x="${x+bw/2}" y="${y1-5}" text-anchor="middle" style="font-size:11.5px">${fmt(v)}</text>`; });
+    g+=`<text x="${L+step*i+step/2}" y="${H-8}" text-anchor="middle">${esc(lb)}</text>`; });
+  el.innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(o.aria||'')}">${g}</svg>`;
 }
 function hbar(el, labels, series, o){
   charts.push(()=>hbar(el,labels,series,o));
@@ -601,6 +624,29 @@ function p2(main){
   if(!SORTS[S.t3sort]) S.t3sort='min';
   const list=Object.values(map).sort(SORTS[S.t3sort][1]);
   const stTxt=STAGES.map(([k,nm])=>a.st[k].n?`${nm} ${a.st[k].n}`:'').filter(Boolean).join(' · ');
+  /* (2) 발령 개월차별 1인당 교육시간: 이 교육간호사 vs 팀 */
+  const KS6=[1,2,3,4,5,6];
+  const perK=(rs)=>KS6.map(k=>{ const r=rs.filter(x=>x[5]!=null&&stage(x)==='N1'&&kOf(x[5],x[0])===k); const n=new Set(r.map(x=>x[5]+'|'+x[0])).size; return {v:n?r.reduce((s,x)=>s+x[4],0)/n:null,n}; });
+  const teamRecs=R.recs.filter(x=>A.some(q=>q.ed===x[1]));
+  const kMine=perK(recsOf(ed,ms)), kTeam=perK(teamRecs);
+  /* (3) 같은 배치구분 동료 비교: 신규간호사(Ⅰ+Ⅱ) 1인당 월평균 */
+  const nnAvg=rs=>{ const r=rs.filter(x=>{const s=stage(x);return s==='N1'||s==='N2';}); const pm=ms.reduce((s,m)=>s+new Set(r.filter(x=>x[0]===m).map(pk2)).size,0); return pm?r.reduce((s,x)=>s+x[4],0)/pm:0; };
+  const myPlace=dp?dp.place:placeOf(lastM,ed);
+  const peers=A.filter(q=>(deptsOf(q.ed,ms)||{}).place===myPlace).map(q=>({ed:q.ed,v:nnAvg(recsOf(q.ed,ms))}));
+  const teamNN=nnAvg(teamRecs);
+  /* (4) 담당부서 신규간호사 Ⅰ 교육 비율 */
+  const dset=new Set(dp?dp.list:[]);
+  const edMs=ms.filter(m=>edAgg(ed,[m]).reports);   // 이 교육간호사가 보고서를 낸 달만
+  const n1Pool=roster.map((r,i)=>({r,i})).filter(({r,i})=>dset.has(deptName(r.dept)) && edMs.some(m=>{const k=kOf(i,m); return k>=1&&k<=6 && (!r.resign||r.resign.slice(0,7)>=m);}));
+  const n1Mine=n1Pool.filter(({i})=>R.recs.some(x=>x[5]===i&&x[1]===ed&&edMs.includes(x[0])));
+  const n1Other=n1Pool.filter(({i})=>!n1Mine.some(q=>q.i===i)&&R.recs.some(x=>x[5]===i&&edMs.includes(x[0])));
+  const covPct=n1Pool.length?n1Mine.length/n1Pool.length*100:0;
+  const covByDept=[...dset].map(d=>{ const pool=n1Pool.filter(q=>deptName(q.r.dept)===d); return {d,all:pool.length,mine:pool.filter(q=>n1Mine.includes(q)).length}; }).filter(x=>x.all);
+  /* (1) 대상자 × 월 교육 흐름표 */
+  const flow=Object.values(map).sort((p,q)=>{ const a1=p.rid!=null?roster[p.rid].start:'9', b1=q.rid!=null?roster[q.rid].start:'9'; return STAGES.findIndex(s=>s[0]===stage(p.last))-STAGES.findIndex(s=>s[0]===stage(q.last)) || (a1<b1?-1:a1>b1?1:0) || p.name.localeCompare(q.name,'ko'); });
+  const fcell={}; recsOf(ed,ms).forEach(x=>{ const k=pk2(x)+'@'+x[0]; fcell[k]=(fcell[k]||0)+x[4]; });
+  const fmax=Math.max(1,...Object.values(fcell));
+  const heat=v=>v?`style="background:color-mix(in srgb, var(--c-HY) ${Math.round(10+45*v/fmax)}%, transparent);${v/fmax>.6?'color:#fff;':''}font-weight:600"`:'';
   /* 월별 교육대상자 목록 */
   const allEdRecs=R.all.filter(x=>x[1]===ed);   // 기간과 관계없이(누적 개월 계산용)
   const mlist=ms.map(m=>({m,n:new Set(recsOf(ed,[m]).map(pk2)).size})).filter(x=>x.n||edAgg(ed,[x.m]).reports);
@@ -623,15 +669,31 @@ function p2(main){
       <div><h3 style="margin:0 0 4px;font-size:14px">월별 교육시간</h3><p class="hint" style="margin:0">단위 분</p>${legend([['--c-HY','현장교육'],['--c-RD','부서라운딩']])}<div class="chart-wrap" id="g4"></div></div>
       <div><h3 style="margin:0 0 4px;font-size:14px">월별 교육대상자 수</h3><p class="hint" style="margin:0">단위 명 · 그 달에 교육한 실인원 · 막대를 누르면 그 달 목록</p>${legend(STAGES.map(s=>[s[2],s[1]]))}<div class="chart-wrap" id="g5"></div></div>
     </div>
+    <h3 style="margin:18px 0 8px;font-size:15px">비교 분석</h3>
+    <div class="cmp3">
+      <div class="cmpc"><b class="ct">발령 개월차별 1인당 교육시간</b><p class="hint" style="margin:2px 0 6px">신규간호사 Ⅰ 1명이 그 개월차 한 달에 받은 평균(분)</p>
+        <div class="legend"><span><i style="background:var(--c-HY)"></i>${esc(dn(ed))}</span><span><i style="background:var(--v0)"></i>팀 평균</span></div><div class="chart-wrap" id="g6"></div></div>
+      <div class="cmpc"><b class="ct">같은 배치구분(${esc(myPlace)}) 비교</b><p class="hint" style="margin:2px 0 6px">신규간호사(Ⅰ+Ⅱ) 1인당 월평균 교육시간(분)</p>
+        <div class="peers">${[...peers,{ed:'팀 전체',v:teamNN,team:true}].map(q=>{const mx=Math.max(1,teamNN,...peers.map(x=>x.v)); return `<div class="pr2${q.ed===ed?' me':''}"><span class="nm">${esc(q.team?q.ed:dn(q.ed))}</span><span class="br"><i style="width:${q.v/mx*100}%;background:var(${q.team?'--v0':q.ed===ed?'--c-HY':'--k2'})"></i></span><b class="num">${fmt(q.v)}</b></div>`;}).join('')}</div>
+        ${peers.length<2?'<p class="note" style="margin:8px 0 0">같은 배치구분 교육간호사가 1명이라 팀 전체와 비교해요</p>':''}</div>
+      <div class="cmpc"><b class="ct">담당부서 신규간호사 Ⅰ 교육 비율</b><p class="hint" style="margin:2px 0 6px">보고서를 낸 달에 발령 1~6개월이었던 담당부서 신규간호사 중 이 교육간호사가 교육한 비율</p>
+        <div class="covn num">${n1Pool.length?covPct.toFixed(0):'–'}<small>%</small></div><div class="note" style="margin:-2px 0 8px">${n1Mine.length}명 / ${n1Pool.length}명${n1Other.length?` · 다른 교육간호사만 교육 ${n1Other.length}명`:''}</div>
+        <div class="peers">${covByDept.map(x=>`<div class="pr2"><span class="nm">${esc(x.d)}</span><span class="br"><i style="width:${x.mine/x.all*100}%;background:var(--c-HY)"></i></span><b class="num">${x.mine}/${x.all}</b></div>`).join('')}</div></div>
+    </div>
     <div style="margin-top:16px" id="edm">${tools('월별 교육대상자 목록','기준월을 고르면 그 달 이 교육간호사가 누구를 교육했는지 보여요 · 팀 평균은 같은 달 교육간호사 1인당 교육대상자 수','t3m')}
       <div class="cg" style="margin-top:10px" id="edm-chips">${mlist.map(x=>`<button class="chip" data-em="${x.m}" aria-pressed="${x.m===em}">${ml(x.m)} <b style="margin-left:4px">${x.n}명</b></button>`).join('')}</div>
       <p class="hint" style="margin:8px 0 0">${ml(em)} 교육대상자 <b style="color:var(--ink)">${mrows.length}명</b> · 같은 달 팀 평균 ${teamM(em).toLocaleString('ko-KR',{maximumFractionDigits:1})}명 · 이번 달 새로 시작 ${mrows.filter(r=>r.isNew).length}명</p>
       <div class="tw tl" style="margin-top:8px;max-height:380px"><table id="t3m"><thead><tr><th>교육대상자</th><th>구분</th><th>부서</th><th>발령일자</th><th>개월차</th><th>${ml(em)} 교육시간(분)</th><th>이 교육간호사 교육 개월</th><th>비고</th></tr></thead><tbody>${
         mrows.length?mrows.map(p=>{const r=p.rid!=null?roster[p.rid]:null; const sg=STAGES.find(s=>s[0]===p.stg); return `<tr><td>${esc(p.name)} ${r&&r.resign?`<span class="st rsg" title="사직일 ${esc(r.resign)}">사직</span>`:''}</td><td><span class="cdot" style="--cc:var(${sg[2]})"></span>${sg[1]}</td><td>${r?esc(deptName(r.dept)):'<span class="note">명단 외</span>'}</td><td class="num">${r?esc(r.start.slice(0,10)):'–'}</td><td class="num">${r?kOf(p.rid,em)+'개월':'–'}</td><td class="num"><b>${fmt(p.min)}</b></td><td class="num">${p.cum}개월째</td><td>${p.isNew?'<span class="st add">새로 시작</span>':'계속'}</td></tr>`;}).join(''):'<tr><td colspan="8" class="note">이 달에는 교육 기록이 없어요</td></tr>'}</tbody></table></div></div>
+    <div style="margin-top:16px">${tools('교육대상자 × 월 교육 흐름','칸 = 그 달 교육시간(분), 진할수록 많이 · 빈칸은 그 달 교육 기록 없음 · 구분 → 발령일 순','t3f')}
+      <div class="tw" style="margin-top:10px;max-height:420px"><table id="t3f" class="eqcol" style="min-width:${300+ms.length*76}px"><thead><tr><th style="width:150px">교육대상자</th><th style="width:110px">구분</th>${ms.map(m=>`<th>${ml(m)}</th>`).join('')}<th class="tot">합계</th></tr></thead><tbody>${
+        flow.map(p=>{ const sg=STAGES.find(s=>s[0]===stage(p.last)); const r=p.rid!=null?roster[p.rid]:null; return `<tr><th>${esc(p.name)} ${r&&r.resign?`<span class="st rsg" title="사직일 ${esc(r.resign)}">사직</span>`:''}</th><td style="text-align:left"><span class="cdot" style="--cc:var(${sg[2]})"></span>${sg[1]}</td>${ms.map(m=>{const v=fcell[pk2(p.last)+'@'+m]||0; return `<td class="num" ${heat(v)}>${v?fmt(v):''}</td>`;}).join('')}<td class="num tot">${fmt(p.min)}</td></tr>`; }).join('')}</tbody>
+        <tfoot><tr class="sum"><th>인원</th><td></td>${ms.map(m=>`<td class="num">${new Set(recsOf(ed,[m]).map(pk2)).size}명</td>`).join('')}<td class="num tot">${flow.length}명</td></tr></tfoot></table></div></div>
     <div style="margin-top:16px">${tools('교육대상자별 교육시간',SORTS[S.t3sort][0]+' · 조회 기간 합계 · 구분·개월차는 마지막 교육월 기준','t3')}<div style="margin-top:8px"><select id="t3sort" aria-label="정렬">${Object.entries(SORTS).map(([k,v])=>`<option value="${k}" ${k===S.t3sort?'selected':''}>${v[0]}</option>`).join('')}</select></div><div class="tw tl" style="margin-top:10px;max-height:380px"><table id="t3"><thead><tr><th>교육대상자</th><th>구분</th><th>부서</th><th>발령일자</th><th>개월차</th><th>교육월 수</th><th>교육시간(분)</th><th>1회 평균(분/월)</th></tr></thead><tbody>${
       list.map(p=>{const r=p.rid!=null?roster[p.rid]:null; const sg=STAGES.find(s=>s[0]===stage(p.last)); return `<tr><td>${esc(p.name)} ${r&&r.resign?`<span class="st rsg" title="사직일 ${esc(r.resign)}">사직</span>`:''}</td><td><span class="cdot" style="--cc:var(${sg[2]})"></span>${sg[1]}</td><td>${r?esc(deptName(r.dept)):'<span class="note">명단 외</span>'}</td><td class="num">${r?esc(r.start.slice(0,10)):'–'}</td><td class="num">${r?kOf(p.rid,p.last[0])+'개월':'–'}</td><td class="num">${p.mm.size}</td><td class="num"><b>${fmt(p.min)}</b></td><td class="num">${fmt(p.min/p.mm.size)}</td></tr>`;}).join('')}</tbody></table></div></div>`;
   document.getElementById('edpick').onchange=e=>{S.ed=e.target.value||null;render();};
   document.getElementById('t3sort').onchange=e=>{S.t3sort=e.target.value;render();document.getElementById('t3').scrollIntoView({block:'center'});};
+  gbar(document.getElementById('g6'),KS6.map(k=>k+'개월'),[{name:dn(ed),c:'--c-HY',values:kMine.map(x=>x.v==null?null:Math.round(x.v)),n:kMine.map(x=>x.n+'명·월')},{name:'팀 평균',c:'--v0',values:kTeam.map(x=>x.v==null?null:Math.round(x.v)),n:kTeam.map(x=>x.n+'명·월')}],{unit:'분',h:230,aria:'발령 개월차별 1인당 교육시간 비교'});
   const goEdm=m=>{ S.edMonth=m; S.edMonthEd=ed; render(); document.getElementById('edm').scrollIntoView({behavior:'smooth',block:'start'}); };
   document.querySelectorAll('#edm-chips [data-em]').forEach(b=>b.onclick=()=>goEdm(b.dataset.em));
   document.getElementById('kpi-ppl').onclick=()=>document.getElementById('edm').scrollIntoView({behavior:'smooth',block:'start'});
