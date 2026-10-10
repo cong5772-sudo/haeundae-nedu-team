@@ -64,6 +64,10 @@
 .st.add{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
 .st.out{color:var(--muted);text-decoration:line-through}
 .cg.mg .chip{height:32px}
+.grid2.eq{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid2.cr{grid-template-columns:minmax(0,1fr) minmax(0,1.8fr)}
+@media (max-width:1100px){.grid2.eq,.grid2.cr{grid-template-columns:minmax(0,1fr)}}
+.eqcard .tw{margin-top:12px}
 table.h2r thead tr:nth-child(2) th{top:34px}
 table.h2r thead tr:first-child th[colspan]{border-left:1px solid var(--line2)}
 table.h2r thead tr:nth-child(2) th:nth-child(odd){border-left:1px solid var(--line2)}
@@ -409,35 +413,32 @@ function p1(main){
   <div class="kpis">
     <div class="kpi"><div class="lab">총 교육시간</div><div class="val num">${fmt(tot)}<small>분</small></div><div class="sub">${fmtH(tot)}시간 · ${ms.length}개월</div></div>
     <div class="kpi"><div class="lab">월평균 교육시간</div><div class="val num">${fmt(tot/ms.length)}<small>분</small></div><div class="sub">${fmtH(tot/ms.length)}시간</div></div>
-    <div class="kpi"><div class="lab">교육대상자 연인원</div><div class="val num">${fmt(pp)}<small>명</small></div><div class="sub">월평균 ${fmt(pp/ms.length)}명</div></div>
-    <div class="kpi"><div class="lab">부서라운딩 비율</div><div class="val num">${R.unitOn?'–':(tot?rn/tot*100:0).toFixed(1)}<small>${R.unitOn?'':'%'}</small></div><div class="sub">${R.unitOn?'간호단위 선택 시 제외':`라운딩 ${fmt(rn)}분 / 총 ${fmt(tot)}분`}</div></div>
+    <div class="kpi"><div class="lab">교육대상자 연인원</div><div class="val num">${fmt(pp)}<small>명</small></div><div class="sub">실인원 ${fmt(new Set(recs.map(pk)).size)}명 · ${ms.length}개월 합계</div></div>
+    <div class="kpi"><div class="lab">월평균 교육대상자</div><div class="val num">${(pp/ms.length).toLocaleString('ko-KR',{maximumFractionDigits:1})}<small>명</small></div><div class="sub">한 달에 교육받은 인원 평균</div></div>
   </div>
-  <div class="grid2" style="align-items:start">
-    <section class="card"><h2>월별 교육시간</h2><p class="hint">단위 분. 막대 위 숫자는 총 교육시간, 점선은 조회 기간 월평균</p>${legend([['--c-HY','현장교육'],['--c-RD','부서라운딩']],'월평균')}<div class="chart-wrap" id="g1"></div></section>
-    <section class="card"><h2>월별 교육대상자 수</h2><p class="hint">그 달 교육받은 사람 수(교육간호사가 달라도 1명). 신규간호사 Ⅰ = 발령 1~6개월, Ⅱ = 7~12개월, 이후는 간호사</p>${legend(STAGES.map(s=>[s[2],s[1]]))}<div class="chart-wrap" id="g2"></div>
-      <div class="tw" style="margin-top:12px"><table id="t1b"><thead><tr><th>기준월</th>${STAGES.map(s=>`<th><span class="cdot" style="--cc:var(${s[2]})"></span>${s[1]}</th>`).join('')}<th class="tot">합계</th></tr></thead>
+  <div class="grid2 eq">
+    <section class="card eqcard">${tools('월별 교육시간','단위 분. 막대 위 숫자는 총 교육시간, 점선은 조회 기간 월평균','t1')}${legend([['--c-HY','현장교육'],['--c-RD','부서라운딩']],'월평균')}<div class="chart-wrap" id="g1"></div>
+      <div class="tw"><table id="t1"><thead><tr><th>기준월</th><th>교육간호사(명)</th><th><span class="cdot" style="--cc:var(--c-HY)"></span>현장교육</th><th><span class="cdot" style="--cc:var(--c-RD)"></span>부서라운딩</th><th class="tot">총 교육시간</th></tr></thead>
+      <tbody>${A.map(x=>`<tr><th>${ml(x.m)}</th><td class="num">${x.eds}</td><td class="num">${fmt(x.hy)}</td><td class="num">${z(x.rn)}</td><td class="num tot">${fmt(x.tot)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr class="sum"><th>합계</th><td></td><td class="num">${fmt(hy)}</td><td class="num">${fmt(rn)}</td><td class="num tot">${fmt(tot)}</td></tr></tfoot></table></div></section>
+    <section class="card eqcard">${tools('월별 교육대상자 수','단위 명. 그 달 교육받은 사람 수(교육간호사가 달라도 1명). 신규간호사 Ⅰ = 발령 1~6개월, Ⅱ = 7~12개월, 이후는 간호사','t1b')}${legend(STAGES.map(s=>[s[2],s[1]]))}<div class="chart-wrap" id="g2"></div>
+      <div class="tw"><table id="t1b"><thead><tr><th>기준월</th>${STAGES.map(s=>`<th><span class="cdot" style="--cc:var(${s[2]})"></span>${s[1]}</th>`).join('')}<th class="tot">합계</th></tr></thead>
       <tbody>${A.map(x=>`<tr><th>${ml(x.m)}</th>${STAGES.map(s=>`<td class="num">${z(x[SK[s[0]]])}</td>`).join('')}<td class="num tot">${fmt(x.pp)}</td></tr>`).join('')}</tbody>
       <tfoot><tr class="sum"><th>연인원</th>${STAGES.map(s=>`<td class="num">${fmt(sumOf(SK[s[0]]))}</td>`).join('')}<td class="num tot">${fmt(pp)}</td></tr></tfoot></table></div></section>
   </div>
-  <section class="card">${tools('월별 상세','교육간호사 수는 그 달 업무보고를 제출한 인원','t1')}
-    <div class="tw" style="margin-top:10px"><table id="t1"><thead><tr><th>기준월</th><th>교육간호사</th>${STAGES.map(s=>`<th><span class="cdot" style="--cc:var(${s[2]})"></span>${s[1]}</th>`).join('')}<th><span class="cdot" style="--cc:var(--c-HY)"></span>현장교육(분)</th><th><span class="cdot" style="--cc:var(--c-RD)"></span>부서라운딩(분)</th><th class="tot">총 교육시간(분)</th></tr></thead>
-    <tbody>${A.map(x=>`<tr><th>${ml(x.m)}</th><td class="num">${x.eds}</td>${STAGES.map(s=>`<td class="num">${z(x[SK[s[0]]])}</td>`).join('')}<td class="num">${fmt(x.hy)}</td><td class="num">${z(x.rn)}</td><td class="num tot">${fmt(x.tot)}</td></tr>`).join('')}</tbody>
-    <tfoot><tr class="sum"><th>합계</th><td></td>${STAGES.map(s=>`<td class="num">${fmt(sumOf(SK[s[0]]))}</td>`).join('')}<td class="num">${fmt(hy)}</td><td class="num">${fmt(rn)}</td><td class="num tot">${fmt(tot)}</td></tr></tfoot></table></div></section>
   <section class="card">${tools('부서군별 교육현황','현장교육시간만 집계(부서라운딩 제외). 교육대상자의 신규명단 부서 기준이며, 명단에 없는 부서이동자·재직간호사는 명단 외. 단위 분','t1c')}
-    <div class="grid2" style="margin-top:10px;align-items:start">
-      <div>${legend(GL.map(q=>[GROUP_C[q.g],q.g]))}<div class="chart-wrap" id="g1d"></div></div>
-      <div class="tw"><table id="t1c"><thead><tr><th>부서군</th>${ms.map(m=>`<th>${ml(m)}</th>`).join('')}<th class="tot">합계</th><th>비율</th><th>교육대상자(명)</th><th>1인당(분)</th></tr></thead>
+    <div style="margin-top:10px">${legend(GL.map(q=>[GROUP_C[q.g],q.g]))}<div class="chart-wrap" id="g1d"></div></div>
+      <div class="tw" style="margin-top:12px"><table id="t1c"><thead><tr><th>부서군</th>${ms.map(m=>`<th>${ml(m)}</th>`).join('')}<th class="tot">합계</th><th>비율</th><th>교육대상자(명)</th><th>1인당(분)</th></tr></thead>
       <tbody>${GL.map(q=>`<tr><th><span class="kc" style="--cc:var(${GROUP_C[q.g]})"><i></i>${esc(q.g)}</span> ${q.g==='명단 외'?'':`<span class="note" style="font-weight:500">${q.units.size}개 부서</span>`}</th>${ms.map(m=>`<td class="num">${z(q.by[m]||0)}</td>`).join('')}<td class="num tot">${fmt(q.tot)}</td><td class="num">${fp(pct(q.tot,hy))}</td><td class="num">${q.ppl.size}</td><td class="num">${fmt(q.tot/q.ppl.size)}</td></tr>`).join('')}</tbody>
-      <tfoot><tr class="sum"><th>합계</th>${ms.map(m=>`<td class="num">${fmt(mTot(m))}</td>`).join('')}<td class="num tot">${fmt(hy)}</td><td class="num">100%</td><td class="num">${new Set(recs.map(pk)).size}</td><td class="num">${fmt(hy/Math.max(1,new Set(recs.map(pk)).size))}</td></tr></tfoot></table></div>
-    </div></section>
-  <div class="grid2" style="align-items:start">
-    <section class="card">${tools('대상자별 현장교육 비중','팀이 제공한 현장교육시간이 어느 대상자에게 얼마나 가는지(%). 막대는 월별 100% 기준','t1d')}
+      <tfoot><tr class="sum"><th>합계</th>${ms.map(m=>`<td class="num">${fmt(mTot(m))}</td>`).join('')}<td class="num tot">${fmt(hy)}</td><td class="num">100%</td><td class="num">${new Set(recs.map(pk)).size}</td><td class="num">${fmt(hy/Math.max(1,new Set(recs.map(pk)).size))}</td></tr></tfoot></table></div></section>
+  <div class="grid2 eq">
+    <section class="card eqcard">${tools('대상자별 현장교육 비중','팀이 제공한 현장교육시간이 어느 대상자에게 얼마나 가는지(%). 막대는 월별 100% 기준','t1d')}
       ${legend(STAGES.map(s=>[s[2],s[1]]))}<div class="chart-wrap" id="g1e"></div>
       <div class="tw" style="margin-top:12px"><table id="t1d"><thead><tr><th>대상자</th>${ms.map(m=>`<th>${ml(m)}</th>`).join('')}<th class="tot">기간 합계(분)</th><th>비중</th></tr></thead>
       <tbody>${STAGES.map(s=>`<tr><th><span class="kc" style="--cc:var(${s[2]})"><i></i>${s[1]}</span></th>${ms.map(m=>`<td class="num">${stMin[s[0]].by[m]?fp(pct(stMin[s[0]].by[m],mTot(m))):'<span class="zero">·</span>'}</td>`).join('')}<td class="num tot">${fmt(stMin[s[0]].tot)}</td><td class="num"><b>${fp(pct(stMin[s[0]].tot,hy))}</b></td></tr>`).join('')}</tbody>
       <tfoot><tr class="sum"><th>합계</th>${ms.map(m=>`<td class="num">100%</td>`).join('')}<td class="num tot">${fmt(hy)}</td><td class="num">100%</td></tr></tfoot></table></div>
       <p class="note" style="margin-top:8px">월별 칸은 그 달 현장교육시간 중 비중. 신규간호사 Ⅰ = 발령 1~6개월, Ⅱ = 7~12개월, 간호사 = 13개월 이후·재직간호사</p></section>
-    <section class="card">${tools('신규간호사 Ⅰ 발령개월차별 비중','신규간호사 Ⅰ에게 제공된 현장교육시간을 발령 개월차별로 나눈 비중(%). 진할수록 발령 후 시간이 지난 간호사','t1e')}
+    <section class="card eqcard">${tools('신규간호사 Ⅰ 발령개월차별 비중','신규간호사 Ⅰ에게 제공된 현장교육시간을 발령 개월차별로 나눈 비중(%). 진할수록 발령 후 시간이 지난 간호사','t1e')}
       ${legend(KL.map(k=>['--k'+k,kName(k)]))}<div class="chart-wrap" id="g1f"></div>
       <div class="tw" style="margin-top:12px"><table id="t1e"><thead><tr><th>발령 개월차</th>${ms.map(m=>`<th>${ml(m)}</th>`).join('')}<th class="tot">기간 합계(분)</th><th>비중</th><th>1인당(분)</th></tr></thead>
       <tbody>${KL.map(k=>`<tr><th><span class="kc" style="--cc:var(--k${k})"><i></i>${kName(k)}</span></th>${ms.map(m=>`<td class="num">${kmap[k].by[m]?fp(pct(kmap[k].by[m],n1m(m))):'<span class="zero">·</span>'}</td>`).join('')}<td class="num tot">${fmt(kmap[k].tot)}</td><td class="num"><b>${fp(pct(kmap[k].tot,n1Tot))}</b></td><td class="num">${kmap[k].ppl.size?fmt(kmap[k].tot/kmap[k].ppl.size):'–'}</td></tr>`).join('')}</tbody>
@@ -445,7 +446,7 @@ function p1(main){
       <p class="note" style="margin-top:8px">1인당 = 그 개월차에 교육받은 신규간호사 1명이 그 달 받은 평균 현장교육시간(분)</p></section>
   </div>
   <section class="card">${tools('배치구분별 신규간호사 1인당 월평균 현장교육시간','교육간호사 배치구분(결재문서 기준)별로, 신규간호사(Ⅰ+Ⅱ) 1명이 한 달에 받은 평균 현장교육시간(분). 점선은 전체 평균','t1f')}
-    <div class="grid2" style="margin-top:10px;align-items:start">
+    <div class="grid2 cr" style="margin-top:10px;align-items:start">
       <div>${legend([],'전체 평균')}<div class="chart-wrap" id="g1g"></div></div>
       <div class="tw"><table id="t1f"><thead><tr><th>배치구분</th>${ms.map(m=>`<th>${ml(m)}</th>`).join('')}<th class="tot">기간 월평균</th></tr></thead>
       <tbody>${PL.map(([n,c])=>`<tr><th><span class="kc" style="--cc:var(${c})"><i></i>${n}</span></th>${ms.map(m=>{const v=pm(pmap[n],m);return `<td class="num">${v==null?'–':fmt(v)}</td>`;}).join('')}<td class="num tot">${fmt(pAvg(pmap[n]))}</td></tr>`).join('')}</tbody>
@@ -455,7 +456,7 @@ function p1(main){
   const fm=v=>fmt(v)+'분';
   vbar(document.getElementById('g1'),ms.map(ml),[{name:'현장교육',c:'--c-HY',values:A.map(x=>x.hy)},{name:'부서라운딩',c:'--c-RD',values:A.map(x=>x.rn)}],{ft:fm,avg:tot/ms.length,aria:'월별 교육시간(분)'});
   vbar(document.getElementById('g2'),ms.map(ml),STAGES.map(s=>({name:s[1],c:s[2],values:A.map(x=>x[SK[s[0]]])})),{ft:v=>fmt(v)+'명',aria:'월별 교육대상자 수'});
-  vbar(document.getElementById('g1d'),ms.map(ml),GL.map(q=>({name:q.g,c:GROUP_C[q.g],values:ms.map(m=>q.by[m]||0)})),{ft:fm,aria:'부서군별 월별 현장교육시간'});
+  vbar(document.getElementById('g1d'),ms.map(ml),GL.map(q=>({name:q.g,c:GROUP_C[q.g],values:ms.map(m=>q.by[m]||0)})),{ft:fm,h:230,aria:'부서군별 월별 현장교육시간'});
   vbar(document.getElementById('g1e'),ms.map(ml),STAGES.map(s=>({name:s[1],c:s[2],values:ms.map(m=>pct(stMin[s[0]].by[m]||0,mTot(m))),tips:ms.map(m=>`${ml(m)} · ${s[1]}: ${fp(pct(stMin[s[0]].by[m]||0,mTot(m)))} (${fmt(stMin[s[0]].by[m]||0)}분)`)})),{max:100,total:false,fy:v=>v+'%',aria:'대상자별 현장교육 비중'});
   vbar(document.getElementById('g1f'),ms.map(ml),KL.map(k=>({name:kName(k),c:'--k'+k,values:ms.map(m=>pct(kmap[k].by[m]||0,n1m(m))),tips:ms.map(m=>`${ml(m)} · ${kName(k)}: ${fp(pct(kmap[k].by[m]||0,n1m(m)))} (${fmt(kmap[k].by[m]||0)}분)`)})),{max:100,total:false,fy:v=>v+'%',aria:'신규간호사 Ⅰ 발령개월차별 비중'});
   vbar(document.getElementById('g1g'),PL.map(p=>p[0]),PL.map(([n,c],i)=>({name:n,c,values:PL.map((_,j)=>j===i?Math.round(pAvg(pmap[n])):0)})),{ft:fm,avg:allPm,aria:'배치구분별 신규간호사 1인당 월평균'});
