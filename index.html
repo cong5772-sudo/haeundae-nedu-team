@@ -102,7 +102,10 @@ table.thist.editing td:nth-child(9) textarea,table.thist.editing td:nth-child(10
 .bform .tg button{padding:8px 14px}
 .bform.off{opacity:.5;pointer-events:none}
 .bcheck{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin-top:10px}
+.bform label{min-width:0}.bform input,.bform select{width:100%;min-width:0;max-width:100%}
 @media (max-width:820px){.bform{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:820px){table.eqcol{min-width:540px}}
+@media (max-width:520px){.bform{grid-template-columns:minmax(0,1fr)}.bform label.wide{grid-column:auto}.bform .tg{display:flex}.bform .tg button{flex:1}}
 .rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:12px}
 @media (max-width:1100px){.rules{grid-template-columns:minmax(0,1fr)}}
 .rule{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--surface)}
@@ -380,7 +383,7 @@ function vbar(el, labels, series, o){
     series.forEach((s,si)=>{ const v=s.values[i]||0; if(!v) return; const y0=y(acc), y1=y(acc+v); acc+=v; const top=si===series.length-1||!series.slice(si+1).some(t=>t.values[i]);
       g+= top ? `<path class="bar" d="M${x},${y0} V${y1+2} q0,-2 2,-2 H${x+bw-2} q2,0 2,2 V${y0} Z" fill="var(${s.c})" data-tip="${esc(s.tips?s.tips[i]:lb+' · '+s.name+': '+(o.ft?o.ft(v):fmt(v)))}"/>`
              : `<rect class="bar" x="${x}" y="${y1}" width="${bw}" height="${Math.max(0,y0-y1-1)}" fill="var(${s.c})" data-tip="${esc(s.tips?s.tips[i]:lb+' · '+s.name+': '+(o.ft?o.ft(v):fmt(v)))}"/>`; });
-    if(o.total!==false) g+=`<text class="tot" x="${x+bw/2}" y="${y(tot[i])-6}" text-anchor="middle">${o.ft?o.ft(tot[i]).replace(/[^\d.,]/g,''):fmt(tot[i])}</text>`;
+    if(o.total!==false) g+=`<text class="tot" x="${x+bw/2}" y="${y(tot[i])-6}" text-anchor="middle"${step<62?` style="font-size:${step<48?10:11}px"`:''}>${step<36&&tot[i]>=10000?(tot[i]/10000).toFixed(1)+'만':(o.ft?o.ft(tot[i]).replace(/[^\d.,]/g,''):fmt(tot[i]))}</text>`;
     g+= tilt ? `<text x="${x+bw/2+4}" y="${H-B+16}" text-anchor="end" transform="rotate(-35 ${x+bw/2+4} ${H-B+16})">${esc(lb)}</text>` : `<text x="${x+bw/2}" y="${H-8}" text-anchor="middle">${esc(lb)}</text>`; });
   if(o.ref!=null){ const yr=y(o.ref); g+=`<line x1="${L}" x2="${W-R+4}" y1="${yr}" y2="${yr}" style="stroke:var(--crit);stroke-width:1.5"/><text x="${W-R+8}" y="${yr-2}" style="fill:var(--crit-ink)">기준</text><text x="${W-R+8}" y="${yr+11}" style="fill:var(--crit-ink)">${fmt(o.ref)}</text>`; }
   if(o.click) g+=labels.map((lb,i)=>`<rect class="hit" x="${L+step*i}" y="${T}" width="${step}" height="${H-T-B}" fill="transparent" style="cursor:pointer" data-i="${i}"/>`).join('');
