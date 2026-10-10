@@ -86,6 +86,15 @@
 /* 나란히 놓인 카드: 표를 카드 아래쪽에 맞춰 두 표의 줄이 같은 높이에 오도록 */
 .grid2.eq{align-items:stretch}
 .eqcard{display:flex;flex-direction:column}
+.rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:12px}
+@media (max-width:1100px){.rules{grid-template-columns:minmax(0,1fr)}}
+.rule{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--surface)}
+.rule .rh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}.rule .rh b{font-size:15px}
+.rule .due{font-size:12.5px;font-weight:700;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:3px 10px;white-space:nowrap}
+.rule .due.unk{color:var(--ink2);background:var(--sunk)}
+.rule .rnow{font-size:13px;font-weight:600;color:var(--crit-ink);background:color-mix(in srgb,var(--crit) 8%,transparent);border-radius:8px;padding:6px 10px;margin-bottom:8px}
+.rule dl{display:grid;grid-template-columns:42px minmax(0,1fr);gap:6px 8px;margin:0;font-size:13.5px;line-height:1.5}
+.rule dt{font-weight:700;color:var(--ink2)}.rule dd{margin:0}
 .drop{display:grid;place-items:center;gap:4px;min-height:150px;margin-top:6px;padding:18px;border:2px dashed var(--line2);border-radius:14px;background:var(--sunk);text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
 .drop:hover,.drop.on{border-color:var(--accent);background:var(--accent-soft)}
 .drop b{font-size:15px}.drop span{font-size:13px;color:var(--muted)}
@@ -755,38 +764,39 @@ function p3(main){
 
 /* ---------- 4. 담당부서 관리 ---------- */
 function p4(main){
-  const eds=[...new Set(D.dept.map(d=>d[1]))].sort((a,b)=>a.localeCompare(b,'ko'));
+  const eds=[...new Set(D.dept.map(d=>d[1]))].sort((a,b)=>ED_ORDER.indexOf(a)-ED_ORDER.indexOf(b));
   const get=(e,m)=>{const r=D.dept.find(d=>d[1]===e&&d[0]===m);return r?r[3]:'';};
   const norm=s=>s.split(',').map(x=>x.trim()).sort().join(',');
-  const lm=DMS[DMS.length-1];
-  const owner={}; D.dept.filter(d=>d[0]===lm).forEach(d=>d[3].split(',').map(x=>x.trim()).forEach(u=>(owner[u]=owner[u]||[]).push(d[1])));
-  const alias={OR:['OR','수술실'],ER:['ER','응급실']}, uds=u=>alias[u]||[u], end=lm+'-31';
-  const units=Object.keys(owner).sort((a,b)=>a.localeCompare(b,'ko',{numeric:true})).map(u=>{const ds=uds(u);
-    return {u,own:owner[u],act:roster.filter(r=>ds.includes(r.dept)&&r.start<=end&&kOf(r.id,lm)<=12&&(!r.resign||r.resign>end)).length,
-      min:nurseAll.filter(x=>x[0]===lm&&ds.includes(roster[x[5]].dept)).reduce((a,x)=>a+x[4],0)};});
+  if(!S.deptMonth||!DMS.includes(S.deptMonth)) S.deptMonth=DMS[DMS.length-1];
+  const lm=S.deptMonth, end=lm+'-31';
+  const rows=D.dept.filter(d=>d[0]===lm).sort((a,b)=>ED_ORDER.indexOf(a[1])-ED_ORDER.indexOf(b[1]));
+  const alias={OR:['OR','수술실'],ER:['ER','응급실'],RCR:['RCR','회복실']}, uds=u=>alias[u]||[u];
+  const units=u=>String(u).split(',').map(x=>x.trim()).filter(Boolean);
+  const newIn=us=>roster.filter(r=>us.some(u=>uds(u).includes(r.dept))&&r.start<=end&&kOf(r.id,lm)>=1&&kOf(r.id,lm)<=12&&(!r.resign||r.resign>end)).length;
   const changes=[];
   DMS.forEach((m,i)=>{ if(!i) return; const pm=DMS[i-1]; eds.forEach(e=>{const v=get(e,m),p=get(e,pm);
-    if(v&&p&&norm(v)!==norm(p)){const a=v.split(',').map(x=>x.trim()),b=p.split(',').map(x=>x.trim());changes.push([m,e,a.filter(x=>!b.includes(x)),b.filter(x=>!a.includes(x)),'']);}
-    else if(v&&!p) changes.push([m,e,v.split(',').map(x=>x.trim()),[],'담당 시작']);
-    else if(!v&&p) changes.push([m,e,[],p.split(',').map(x=>x.trim()),'담당 종료']); }); });
+    if(v&&p&&norm(v)!==norm(p)){const a=units(v),b=units(p);changes.push([m,e,a.filter(x=>!b.includes(x)),b.filter(x=>!a.includes(x)),'']);}
+    else if(v&&!p) changes.push([m,e,units(v),[],'담당 시작']);
+    else if(!v&&p) changes.push([m,e,[],units(p),'담당 종료']); }); });
+  const allUnits=new Set(rows.flatMap(r=>units(r[3])));
+  const prev=DMS[DMS.indexOf(lm)-1];
   main.insertAdjacentHTML('beforeend',`
+  <div class="card tools" style="padding:14px 20px"><div class="seg"><span class="gl">기준월</span>${DMS.map(mm=>`<button class="chip" data-dm="${mm}" aria-pressed="${mm===lm}">${ml(mm)}</button>`).join('')}</div></div>
   <div class="kpis">
-    <div class="kpi"><div class="lab">담당 교육간호사</div><div class="val num">${owner?new Set(Object.values(owner).flat()).size:0}<small>명</small></div><div class="sub">${ml(lm)} 결재문서 기준</div></div>
-    <div class="kpi"><div class="lab">담당 부서</div><div class="val num">${units.length}<small>개</small></div><div class="sub">교육간호사가 배정된 부서</div></div>
-    <div class="kpi"><div class="lab">1년 이내 재직 신규간호사</div><div class="val num">${units.reduce((a,u)=>a+u.act,0)}<small>명</small></div><div class="sub">담당 부서 합계</div></div>
-    <div class="kpi"><div class="lab">담당부서 변경</div><div class="val num">${changes.length}<small>건</small></div><div class="sub">${ml(DMS[0])}~${ml(lm)} 직전 달 대비</div></div>
+    <div class="kpi"><div class="lab">현장교육간호사</div><div class="val num">${rows.length}<small>명</small></div><div class="sub">${ml(lm)} 결재문서 기준</div></div>
+    <div class="kpi"><div class="lab">담당 부서</div><div class="val num">${allUnits.size}<small>개</small></div><div class="sub">교육간호사가 배정된 부서</div></div>
+    <div class="kpi"><div class="lab">1년 이내 재직 신규간호사</div><div class="val num">${newIn([...allUnits])}<small>명</small></div><div class="sub">담당 부서 합계 · ${ml(lm)} 말 기준</div></div>
+    <div class="kpi"><div class="lab">담당부서 변경</div><div class="val num">${changes.filter(c=>c[0]===lm).length}<small>건</small></div><div class="sub">${prev?ml(prev)+' 대비':'첫 달'}</div></div>
   </div>
+  <section class="card">${tools(`${ml(lm)} 현장교육간호사별 담당부서`,'배치구분 순 · <span class="chg">파란 배지</span>는 직전 달보다 새로 맡은 부서','t5m')}
+    <div class="tw" style="margin-top:10px"><table id="t5m"><thead><tr><th style="width:150px">교육간호사</th><th style="width:130px;text-align:left">배치구분</th><th style="text-align:left">담당부서</th><th style="width:110px">부서 수</th><th style="width:150px">1년 이내 재직 신규(명)</th></tr></thead><tbody>${
+      rows.map(r=>{ const us=units(r[3]), pu=prev?units(get(r[1],prev)):[]; return `<tr><th>${esc(dn(r[1]))}</th><td style="text-align:left">${esc(placeName(r[2]))}</td><td style="text-align:left">${us.map(u=>`<span class="st${prev&&!pu.includes(u)?' add':''}" style="margin:2px 4px 2px 0">${esc(deptName(u))}</span>`).join('')}</td><td class="num">${us.length}</td><td class="num">${z(newIn(us))}</td></tr>`; }).join('')}</tbody></table></div></section>
   <section class="card">${tools('교육간호사 × 월 담당부서','<span class="chg">파란 글씨</span>는 직전 달과 담당부서가 달라진 달','t5')}
     <div class="tw" style="margin-top:10px"><table id="t5"><thead><tr><th>교육간호사</th>${DMS.map(m=>`<th style="text-align:center">${ml(m)}</th>`).join('')}</tr></thead><tbody>${
-      eds.map(e=>`<tr><th>${esc(e)}</th>${DMS.map((m,i)=>{const v=get(e,m),p=i?get(e,DMS[i-1]):v;const ch=i&&v&&((p&&norm(v)!==norm(p))||(!p&&DMS.slice(0,i).some(x=>get(e,x))));return `<td style="text-align:center">${v?(ch?`<span class="chg">${esc(v)}</span>`:esc(v)):'–'}</td>`;}).join('')}</tr>`).join('')}</tbody></table></div></section>
-  <div class="grid2">
-    <section class="card">${tools(`부서별 현황 <span class="note" style="font-weight:500">${ml(lm)} 기준</span>`,'재직 신규 = 발령 12개월 이내이면서 사직하지 않은 신규간호사','t6')}
-      <div class="tw" style="margin-top:10px"><table id="t6"><thead><tr><th>부서</th><th style="text-align:left">담당 교육간호사</th><th>재직 신규(명)</th><th>신규 현장교육(분)</th></tr></thead><tbody>${
-        units.map(x=>`<tr><th>${esc(x.u)}</th><td style="text-align:left">${x.own.map(esc).join(', ')}</td><td class="num">${z(x.act)}</td><td class="num">${z(x.min)}</td></tr>`).join('')}</tbody>
-        <tfoot><tr class="sum"><th>합계</th><td></td><td class="num">${units.reduce((a,u)=>a+u.act,0)}</td><td class="num">${fmt(units.reduce((a,u)=>a+u.min,0))}</td></tr></tfoot></table></div></section>
-    <section class="card"><h2>담당부서 변경 이력</h2><p class="hint">직전 달 결재문서와 비교</p>${
-      changes.map(c=>`<div class="tline"><div class="m">${ml(c[0])}</div><div><b>${esc(c[1])}</b> ${c[4]?`<span class="note">${c[4]}</span> `:''}${c[2].map(x=>`<span class="st add">+ ${esc(x)}</span>`).join(' ')} ${c[3].map(x=>`<span class="st out">${esc(x)}</span>`).join(' ')}</div></div>`).join('')||'<p class="note">변경 이력이 없어요</p>'}</section>
-  </div>`);
+      eds.map(e=>`<tr><th>${esc(dn(e))}</th>${DMS.map((m,i)=>{const v=get(e,m),p=i?get(e,DMS[i-1]):v;const ch=i&&v&&((p&&norm(v)!==norm(p))||(!p&&DMS.slice(0,i).some(x=>get(e,x))));return `<td style="text-align:center${m===lm?';background:var(--accent-soft)':''}">${v?(ch?`<span class="chg">${esc(v)}</span>`:esc(v)):'–'}</td>`;}).join('')}</tr>`).join('')}</tbody></table></div></section>
+  <section class="card"><h2>담당부서 변경 이력</h2><p class="hint">직전 달 결재문서와 비교</p>${
+    changes.slice().reverse().map(c=>`<div class="tline"><div class="m">${ml(c[0])}</div><div><b>${esc(dn(c[1]))}</b> ${c[4]?`<span class="note">${c[4]}</span> `:''}${c[2].map(x=>`<span class="st add">+ ${esc(x)}</span>`).join(' ')} ${c[3].map(x=>`<span class="st out">${esc(x)}</span>`).join(' ')}</div></div>`).join('')||'<p class="note">변경 이력이 없어요</p>'}</section>`);
+  main.querySelectorAll('[data-dm]').forEach(b=>b.onclick=()=>{ S.deptMonth=b.dataset.dm; render(); });
 }
 
 /* ---------- 5. 사업신고 인력 관리 ---------- */
@@ -796,7 +806,34 @@ function p5(main){
   const okM=mm=>BIZ.every(b=>cnt(mm,b)===D.bizStd[b]);
   const chM=mm=>D.biz.filter(x=>x[0]===mm&&(x[7]==='추가'||x[7]==='제외')).length;
   const stdSum=BIZ.reduce((a,b)=>a+D.bizStd[b],0);
+  const nextM=mm=>{ const d=new Date(+mm.slice(0,4), +mm.slice(5), 1); return (d.getMonth()+1)+'월'; };
+  const chg=b=>D.biz.filter(x=>x[0]===m&&x[1]===b&&(x[7]==='추가'||x[7]==='제외'));
+  const RULES=[
+    {b:'간호간병 교육전담간호사 지원사업', src:'건보공단 「교육전담간호사 인센티브제 세부운영기준」(2025.1.)', ok:true, due:'변경일로부터 7일 이내', items:[
+      ['신고','추가·교체·감축·퇴사 시 <b>변경일로부터 7일 이내</b> 요양기관정보마당 전산 신청(교육전담간호사 제공인력변경)'],
+      ['서류','추가·교체 시 근로계약서(또는 기존 계약서+내부발령문서+근무동의서), 교육전담부서 구성 현황'],
+      ['지연','<b>14일 이상 늦으면</b> 변경 요청 공문(지연 사유) + 변경일 증빙(근무표) 추가 제출'],
+      ['주의','휴가·병가 등 <b>15일 이상 연속 미근무</b>(주말·공휴일 포함), 1일 8시간·주 40시간 미준수, 통합병동 교육 외 업무 시 인센티브 제한'],
+      ['중복','간호관리료 차등제·통합병동 인력 산정 포함 또는 다른 사업과 중복 배치 금지'],
+      ['자료','분기 교육운영 자료: 해당 분기 다음 달 1~15일 제출']]},
+    {b:'간호사 교대제 개선 시범사업', src:'보건복지부 「제2차 간호사 교대제 개선 시범사업 지침」', ok:true, due:'근무 월 다음 달 5일까지', items:[
+      ['신고','인력 현황 변경: <b>근무 월 다음 달 5일까지</b> 보건의료자원통합신고포털(현황신고·변경 > 인력현황), \'교육전담간호사팀\'으로 신고'],
+      ['서류','교육전담부서 구성현황(별지 12호): 근무 월 다음 달 11~15일 시범사업자료제출시스템'],
+      ['대체','퇴사·이동·병가 등 부재 시 <b>15일 이내 대체 배치</b>. 16일 이상 연속 부재 시 지원금 제한(16~30일은 부재 기간만 미지급)'],
+      ['중복','간호등급 인력 산정 제외. 간호간병 교육전담 등 유사 사업과 중복 불가(확인 시 환수). 타 사업 인력과 구분해 신고'],
+      ['자격','경력 3년 이상 + 최근 2년 이내 교육전담간호사 양성교육(기본과정) 이수, 주 40시간'],
+      ['감산','반기 중간에 바뀐 인력은 첫 배치일 기준으로 경력 요건 산정']]},
+    {b:'필수의료간호사 양성지원사업', src:'보건복지부 사업 공고(2025) · 세부 운영지침은 위탁기관 공지 확인', ok:false, due:'올해 운영지침 확인', items:[
+      ['신고','변경 신고 기한·방법은 <b>올해 사업 운영지침/위탁기관 공지로 확인 필요</b>(공개 원문 미확인). 변경 즉시 위탁기관에 문의'],
+      ['자격','중환자실·응급실·수술실·집중치료실 합산 임상경력 2년 이상(2025 공고 기준)'],
+      ['중복','다른 교육전담 지원사업(간호간병·교대제)과 같은 사람 중복 신고 불가'],
+      ['참고','교육전담간호사 1인당 월 320만원 지원(2025~2026 공고)']]}
+  ];
   main.insertAdjacentHTML('beforeend',`
+  <section class="card"><div class="hd-row"><div><h2>교육간호사 인력 변경 시 신고 기준</h2><p class="hint" style="margin:0">사업별 지침 요약 · 2026-10-11 확인 · 실제 신고 전 최신 지침을 꼭 확인하세요</p></div></div>
+    <div class="rules">${RULES.map(r=>{ const c=chg(r.b); return `<div class="rule"><div class="rh"><b>${esc(BIZ_SHORT[r.b]==='통합'?'간호간병':BIZ_SHORT[r.b]==='교대제'?'교대제 개선':'필수의료')}</b><span class="due${r.ok?'':' unk'}">${esc(r.due)}</span></div>
+      ${c.length?`<div class="rnow">${ml(m)} 변동 ${c.length}건 · ${r.b.indexOf('교대제')>=0?`${nextM(m)} 5일까지 신고`:r.ok?'변경일로부터 7일 이내 신고':'위탁기관 확인'}</div>`:''}
+      <dl>${r.items.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl><p class="note" style="margin:8px 0 0">${esc(r.src)}</p></div>`; }).join('')}</div></section>
   <div class="card tools" style="padding:14px 20px"><div class="seg"><span class="gl">기준월</span>${BMS.map(mm=>`<button class="chip" data-bm="${mm}" aria-pressed="${mm===m}">${ml(mm)}</button>`).join('')}</div></div>
   <div class="kpis">
     <div class="kpi"><div class="lab">${ml(m)} 신고 인원</div><div class="val num">${BIZ.reduce((a,b)=>a+cnt(m,b),0)}<small>/ ${stdSum}명</small></div><div class="sub">${okM(m)?'사업별 기준 인원 충족':'기준 인원과 다름 — 확인 필요'}</div></div>
