@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>간호교육팀 운영 대시보드</title>
+<!-- 디자인 시스템: 디자인시스템_간호교육대시보드/dashboard.css 그대로. 이 대시보드 구분 색만 아래에서 지정 -->
+<link rel="stylesheet" href="dashboard.css">
+<style>
+/* 이 대시보드의 데이터 구분 색 (기본 팔레트 --c-* 를 역할 이름으로 연결) */
+:root{
+  --c-HY:var(--c-REG);   /* 현장교육 */
+  --c-RD:var(--c-SEN);   /* 부서라운딩 */
+  --c-NEW:var(--c-REG);  /* 신규간호사 */
+  --c-MV:var(--c-SEN);   /* 부서이동자 */
+  --c-ETC:var(--c-DED);  /* 기타 간호사 */
+  --c-K1:var(--c-REG);--c-K2:var(--c-SEN);--c-K3:var(--c-DED);--c-K4:var(--c-MOV); /* 발령 차수 비교 */
+  --c-B1:var(--c-DED);--c-B2:var(--c-REG);--c-B3:var(--c-PTL); /* 사업 */
+}
+/* 이 대시보드에서 추가로 쓰는 작은 부품 (디자인 시스템 규칙 안에서) */
+.chart-wrap{width:100%}
+.chart .avg{stroke:var(--muted);stroke-dasharray:4 4;stroke-width:1}
+.chart .pt{stroke:var(--surface);stroke-width:2}
+.chart .ln{fill:none;stroke-width:2}
+.chg{color:var(--accent);font-weight:700}
+.chg::before{content:"● ";font-size:9px;vertical-align:1px}
+.out-n{color:var(--muted);text-decoration:line-through}
+.bizcards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.mem{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--sunk)}
+.mem+.mem{margin-top:6px}
+.mem b{font-weight:600}
+.mem.out{background:none}.mem.out b{color:var(--muted);text-decoration:line-through;font-weight:500}
+.okline{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600}
+.okline i{width:8px;height:8px;border-radius:50%;background:var(--good)}
+.okline.bad i{background:var(--crit)}.okline.bad{color:var(--crit-ink)}
+.tline{display:grid;grid-template-columns:64px minmax(0,1fr);gap:10px;padding:9px 0;border-bottom:1px dashed var(--line);font-size:13px}
+.tline:last-child{border-bottom:0}.tline .m{font-weight:700;color:var(--navy)}
+.st.add{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
+.st.out{color:var(--muted);text-decoration:line-through}
+.cg.mg .chip{height:32px}
+.ret{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.ret .b{padding:14px 16px;border:1px solid var(--line);border-radius:14px}
+.ret .b .n{font-size:26px;font-weight:700}.ret .b .n small{font-size:13px;font-weight:500;color:var(--ink2);margin-left:3px}
+.hd-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.hd-row select{height:34px;border:1px solid var(--line2);border-radius:10px;background:var(--surface);color:var(--ink);padding:0 10px;font-size:13px}
+.nm-s{display:none}
+@media (max-width:1100px){.bizcards{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:820px){.nm-f{display:none}.nm-s{display:inline}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="tb-l"><span class="logo-sq" aria-hidden="true">+</span><b class="tb-title">간호교육팀 운영 대시보드</b></div>
+  <div class="tb-r">
+    <div class="org"><b>해운대백병원 간호국</b><small>간호교육팀</small></div>
+    <span class="pill"><span class="dot"></span>데이터 기준 <b class="num" id="asof"></b></span>
+    <span class="pill" id="who" style="color:var(--navy);font-weight:600"></span>
+    <button class="refresh" id="reload" title="시트에서 다시 불러오기" aria-label="새로고침">⟳</button>
+    <button class="btn" id="logout">로그아웃</button>
+  </div>
+</header>
+
+<div id="login" hidden>
+  <div class="lg">
+    <div class="lg-head"><span class="logo-sq" aria-hidden="true">+</span><h1>간호교육팀 운영 대시보드</h1><p>해운대백병원 간호국 · 교육간호사 개인정보가 포함되어 있어 로그인이 필요합니다</p></div>
+    <div class="lg-grid">
+      <div class="lg-box"><h2>간호교육팀</h2><p class="d">간호교육팀 비밀번호로 로그인합니다.</p>
+        <form id="pwform"><input type="password" id="pw" placeholder="비밀번호" autocomplete="current-password" required><button class="btn pri" type="submit">로그인</button></form>
+        <p class="lg-err" id="lgerr"></p></div>
+      <div class="lg-box"><h2>구글 계정</h2><p class="d">열람이 허용된 구글 계정으로 로그인합니다. 허용 명단은 간호교육팀이 관리합니다.</p>
+        <div id="gbtn"></div><p class="lg-err" id="lgerr2"></p></div>
+    </div>
+    <p class="lg-foot">외부 공유 금지 · 조회 기록이 남습니다</p>
+  </div>
+</div>
+<div id="loading" hidden style="position:fixed;inset:0;z-index:90;display:grid;place-items:center;background:var(--bg)"><p class="note">구글시트에서 데이터를 불러오는 중…</p></div>
+
+<div class="app">
+  <aside class="side">
+    <nav class="navcard" aria-label="페이지"><div class="navlist" id="nav"></div></nav>
+    <details class="fcard" open>
+      <summary>조회 조건 <span id="f-sum"></span></summary>
+      <div class="fgrid">
+        <div class="fs"><span class="fl">기준월</span>
+          <div class="cg"><button class="chip" id="m-all" aria-pressed="true">전체</button></div>
+          <div class="cg mg" id="m-chips"></div></div>
+        <p class="fhint" id="f-hint"></p>
+        <button class="freset" id="f-reset">조회 조건 초기화</button>
+      </div>
+    </details>
+    <div class="navfoot"><b>자료 출처</b>현장교육간호사 월별 업무보고, 신규간호사 명단, 월별 결재문서, 사업별 신고현황<br>이진호(전담) 보고서는 제외</div>
+  </aside>
+
+  <main class="main" id="main"></main>
+</div>
+<div id="tip" hidden></div>
+
+<script src="config.js"></script>
+<script>
+window.bootApp = function(D, who){
+'use strict';
+document.getElementById('who').textContent = who || '';
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => Math.round(n).toLocaleString('ko-KR');
+const fmtH = m => (m/60).toLocaleString('ko-KR',{maximumFractionDigits:1});
+const ml = m => (+m.slice(5))+'월';
+const z = v => v ? fmt(v) : '<span class="zero">·</span>';
+const roster = D.roster;
+const MONTHS = [...new Set(D.rounds.map(r=>r[0]))].sort();
+const EDS = [...new Set(D.rounds.map(r=>r[1]))].sort((a,b)=>a.localeCompare(b,'ko'));
+const kOf = (rid,m)=>{const s=roster[rid].start;return (+m.slice(0,4)-+s.slice(0,4))*12+(+m.slice(5,7)-+s.slice(5,7))+1;};
+const cohortOf = rid => roster[rid].start.slice(0,7);
+const cohortName = c => `${c.slice(2,4)}년 ${+c.slice(5)}월 발령`;
+const nurseRecs = D.recs.filter(x=>x[5]!=null);
+const COHORTS = [...new Set(nurseRecs.map(x=>cohortOf(x[5])))].sort();
+const BIZ = Object.keys(D.bizStd);
+const BIZ_SHORT = {'간호간병 교육전담간호사 지원사업':'통합','간호사 교대제 개선 시범사업':'교대제','필수의료간호사 양성지원사업':'필수'};
+const BIZ_C = {'간호간병 교육전담간호사 지원사업':'--c-B1','간호사 교대제 개선 시범사업':'--c-B2','필수의료간호사 양성지원사업':'--c-B3'};
+const BMS = [...new Set(D.biz.map(b=>b[0]))].sort();
+const DMS = [...new Set(D.dept.map(d=>d[0]))].sort();
+
+const PAGES = [
+  {id:'p1', ic:'▤', name:'월별 교육현황', period:true, desc:'현장교육간호사가 제공한 월별 교육시간과 교육대상자 수입니다. 총 교육시간 = 현장교육 + 부서라운딩.'},
+  {id:'p2', ic:'◉', name:'교육간호사별 교육현황', period:true, desc:'교육간호사별 교육시간 비교와 개인별 월 추이·교육대상자 목록입니다.'},
+  {id:'p3', ic:'▦', name:'현장교육 세부분석', period:true, desc:'신규간호사 발령 차수·발령 개월차·부서별 현장교육 시간입니다.'},
+  {id:'p4', ic:'⌂', name:'담당부서 관리', period:false, desc:'월별 결재문서 기준 교육간호사 담당부서와 변경 이력입니다.'},
+  {id:'p5', ic:'✓', name:'사업신고 인력 관리', period:false, desc:'사업별 신고 인원(매월 기준 9명)과 변동 내역입니다. 사업운영기준에 따른 변동 보고 확인용입니다.'}
+];
+
+/* ---------- 상태 ---------- */
+const S = {page:'p1', months:new Set(MONTHS), ed:null, cohorts:COHORTS.slice(-4), nCohort:COHORTS[COHORTS.length-1], nDept:'', bizMonth:BMS[BMS.length-1]};
+const selMonths = () => MONTHS.filter(m=>S.months.has(m));
+
+/* ---------- 상단·메뉴·조회조건 ---------- */
+document.getElementById('asof').textContent = D.updated;
+document.getElementById('reload').onclick = ()=>window.opsReload();
+const nav = document.getElementById('nav');
+const SHORT={p1:'월별',p2:'교육간호사',p3:'세부분석',p4:'담당부서',p5:'사업신고'};
+nav.innerHTML = PAGES.map(p=>`<button class="navbtn" data-p="${p.id}"><span class="ic">${p.ic}</span><span class="nm-f">${p.name}</span><span class="nm-s">${SHORT[p.id]}</span></button>`).join('');
+if(innerWidth<=820) document.querySelector('.fcard').removeAttribute('open');
+nav.onclick = e => { const b=e.target.closest('[data-p]'); if(b) location.hash=b.dataset.p; };
+window.addEventListener('hashchange', route);
+const mc = document.getElementById('m-chips');
+mc.innerHTML = MONTHS.map(m=>`<button class="chip" data-m="${m}">${ml(m)}</button>`).join('');
+mc.onclick = e => { const b=e.target.closest('[data-m]'); if(!b) return; const m=b.dataset.m;
+  if(S.months.size===MONTHS.length){ S.months=new Set([m]); } else if(S.months.has(m)){ S.months.delete(m); if(!S.months.size) S.months=new Set(MONTHS); } else S.months.add(m);
+  render(); };
+document.getElementById('m-all').onclick = ()=>{ S.months=new Set(MONTHS); render(); };
+document.getElementById('f-reset').onclick = ()=>{ S.months=new Set(MONTHS); S.cohorts=COHORTS.slice(-4); S.ed=null; render(); };
+function syncFilter(page){
+  const all=S.months.size===MONTHS.length, ms=selMonths();
+  document.getElementById('m-all').setAttribute('aria-pressed',all);
+  mc.querySelectorAll('[data-m]').forEach(b=>b.setAttribute('aria-pressed',!all&&S.months.has(b.dataset.m)));
+  mc.querySelectorAll('.chip').forEach(b=>b.disabled=!page.period);
+  document.getElementById('m-all').disabled=!page.period;
+  document.getElementById('f-sum').textContent = page.period ? (all?`2026년 ${ml(MONTHS[0])}~${ml(MONTHS[MONTHS.length-1])}`:ms.map(ml).join(', ')) : '이 페이지는 적용 안 됨';
+  document.getElementById('f-hint').textContent = page.period ? '월을 누르면 그 달만 보고, 여러 달을 함께 고를 수 있어요.' : '이 페이지는 조회 조건을 쓰지 않고 페이지 안에서 기준월을 고릅니다.';
+}
+
+/* ---------- 말풍선 ---------- */
+const tip = document.getElementById('tip');
+document.addEventListener('pointerover', e => { const t=e.target.closest('[data-tip]'); if(!t){tip.hidden=true;return;} tip.textContent=t.dataset.tip; tip.hidden=false; });
+document.addEventListener('pointermove', e => { if(!tip.hidden){ tip.style.left=Math.min(innerWidth-270,e.clientX+12)+'px'; tip.style.top=(e.clientY+14)+'px'; } });
+document.addEventListener('pointerdown', e => { const t=e.target.closest('[data-tip]'); if(t){ tip.textContent=t.dataset.tip; tip.hidden=false; tip.style.left=Math.min(innerWidth-270,e.clientX+12)+'px'; tip.style.top=(e.clientY+14)+'px'; } });
+
+/* ---------- SVG 그래프 (화면 폭에 맞춰 viewBox 계산) ---------- */
+const niceMax = v => { if(v<=0) return 1; const p=Math.pow(10,Math.floor(Math.log10(v))); const n=v/p; return (n<=1?1:n<=2?2:n<=2.5?2.5:n<=5?5:10)*p; };
+const charts = [];
+function vbar(el, labels, series, o){
+  charts.push(()=>vbar(el,labels,series,o));
+  const W=Math.max(280,el.clientWidth), H=o.h||240, L=44, R=8, T=22, B=26;
+  const tot=labels.map((_,i)=>series.reduce((a,s)=>a+(s.values[i]||0),0));
+  const max=niceMax(Math.max(...tot)), y=v=>T+(H-T-B)*(1-v/max), step=(W-L-R)/labels.length, bw=Math.min(46,step*.56);
+  let g='';
+  for(let i=0;i<=4;i++){ const v=max*i/4, yy=y(v); g+=`<line class="grid" x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}"/><text x="${L-6}" y="${yy+4}" text-anchor="end">${o.fy?o.fy(v):fmt(v)}</text>`; }
+  labels.forEach((lb,i)=>{ const x=L+step*i+(step-bw)/2; let acc=0;
+    series.forEach((s,si)=>{ const v=s.values[i]||0; if(!v) return; const y0=y(acc), y1=y(acc+v); acc+=v; const top=si===series.length-1||!series.slice(si+1).some(t=>t.values[i]);
+      g+= top ? `<path class="bar" d="M${x},${y0} V${y1+2} q0,-2 2,-2 H${x+bw-2} q2,0 2,2 V${y0} Z" fill="var(${s.c})" data-tip="${esc(lb)} · ${esc(s.name)}: ${o.ft?o.ft(v):fmt(v)}"/>`
+             : `<rect class="bar" x="${x}" y="${y1}" width="${bw}" height="${Math.max(0,y0-y1-1)}" fill="var(${s.c})" data-tip="${esc(lb)} · ${esc(s.name)}: ${o.ft?o.ft(v):fmt(v)}"/>`; });
+    if(o.total!==false) g+=`<text class="tot" x="${x+bw/2}" y="${y(tot[i])-6}" text-anchor="middle">${o.ft?o.ft(tot[i]).replace(/[^\d.,]/g,''):fmt(tot[i])}</text>`;
+    g+=`<text x="${x+bw/2}" y="${H-8}" text-anchor="middle">${esc(lb)}</text>`; });
+  el.innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(o.aria||'')}">${g}</svg>`;
+}
+function hbar(el, labels, series, o){
+  charts.push(()=>hbar(el,labels,series,o));
+  const W=Math.max(280,el.clientWidth), rowH=o.rowH||26, T=6, B=22, L=o.L||64, R=48, H=T+B+rowH*labels.length;
+  const tot=labels.map((_,i)=>series.reduce((a,s)=>a+(s.values[i]||0),0));
+  const max=niceMax(Math.max(...tot)), x=v=>L+(W-L-R)*v/max, bh=Math.min(16,rowH*.62);
+  let g='';
+  for(let i=0;i<=4;i++){ const v=max*i/4, xx=x(v); g+=`<line class="grid" x1="${xx}" x2="${xx}" y1="${T}" y2="${H-B}"/><text x="${xx}" y="${H-6}" text-anchor="middle">${o.fx?o.fx(v):fmt(v)}</text>`; }
+  labels.forEach((lb,i)=>{ const yy=T+rowH*i+(rowH-bh)/2; let acc=0;
+    series.forEach((s,si)=>{ const v=s.values[i]||0; if(!v) return; const x0=x(acc), x1=x(acc+v); acc+=v; const end=!series.slice(si+1).some(t=>t.values[i]);
+      g+= end ? `<path class="bar" d="M${x0},${yy} H${x1-2} q2,0 2,2 V${yy+bh-2} q0,2 -2,2 H${x0} Z" fill="var(${s.c})" data-tip="${esc(lb)} · ${esc(s.name)}: ${o.ft?o.ft(v):fmt(v)}" ${o.click?`data-key="${esc(lb)}"`:''}/>`
+              : `<rect class="bar" x="${x0}" y="${yy}" width="${Math.max(0,x1-x0-1)}" height="${bh}" fill="var(${s.c})" data-tip="${esc(lb)} · ${esc(s.name)}: ${o.ft?o.ft(v):fmt(v)}" ${o.click?`data-key="${esc(lb)}"`:''}/>`; });
+    g+=`<text x="${L-8}" y="${yy+bh/2+4}" text-anchor="end" ${o.sel===lb?'class="tot"':''}>${esc(lb)}</text><text class="tot" x="${x(tot[i])+6}" y="${yy+bh/2+4}">${o.ft?o.ft(tot[i]).replace(/[^\d.,]/g,''):fmt(tot[i])}</text>`; });
+  el.innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(o.aria||'')}">${g}</svg>`;
+  if(o.click) el.querySelectorAll('[data-key]').forEach(b=>b.addEventListener('click',()=>o.click(b.dataset.key)));
+}
+function line(el, labels, series, o){
+  charts.push(()=>line(el,labels,series,o));
+  const W=Math.max(280,el.clientWidth), H=o.h||250, L=48, R=12, T=14, B=30;
+  const vals=series.flatMap(s=>s.values.filter(v=>v!=null)); const max=niceMax(Math.max(1,...vals));
+  const step=(W-L-R)/Math.max(1,labels.length-1), x=i=>L+step*i, y=v=>T+(H-T-B)*(1-v/max);
+  let g='';
+  for(let i=0;i<=4;i++){ const v=max*i/4, yy=y(v); g+=`<line class="grid" x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}"/><text x="${L-6}" y="${yy+4}" text-anchor="end">${fmt(v)}</text>`; }
+  labels.forEach((lb,i)=>{ g+=`<text x="${x(i)}" y="${H-10}" text-anchor="middle">${esc(lb)}</text>`; });
+  series.forEach(s=>{ let d='', pen=false; s.values.forEach((v,i)=>{ if(v==null){pen=false;return;} d+=(pen?'L':'M')+x(i)+','+y(v)+' '; pen=true; });
+    g+=`<path class="ln" d="${d}" stroke="var(${s.c})"/>`;
+    s.values.forEach((v,i)=>{ if(v!=null) g+=`<circle class="pt bar" cx="${x(i)}" cy="${y(v)}" r="4.5" fill="var(${s.c})" data-tip="${esc(s.name)} · ${esc(labels[i])}개월차: ${fmt(v)}분 (${s.n[i]}명)"/>`; }); });
+  el.innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(o.aria||'')}">${g}</svg>`;
+}
+let rz; window.addEventListener('resize',()=>{ clearTimeout(rz); rz=setTimeout(()=>{ const fs=charts.splice(0); fs.forEach(f=>f()); },160); });
+const legend = items => `<div class="legend">${items.map(([c,n])=>`<span><i style="background:var(${c})"></i>${esc(n)}</span>`).join('')}</div>`;
+
+/* ---------- 집계 ---------- */
+function monthAgg(m){
+  const r=D.recs.filter(x=>x[0]===m), rd=D.rounds.filter(x=>x[0]===m);
+  const hy=r.reduce((a,x)=>a+x[4],0), rn=rd.reduce((a,x)=>a+x[2],0);
+  const ppl=t=>new Set(r.filter(x=>x[3]===t).map(x=>x[5]!=null?'r'+x[5]:x[2])).size;
+  return {m,hy,rn,tot:hy+rn,nn:ppl('신규'),mv:ppl('이동'),et:ppl('기타'),eds:rd.length};
+}
+function edAgg(ed,ms){
+  const r=D.recs.filter(x=>x[1]===ed&&ms.includes(x[0])), rd=D.rounds.filter(x=>x[1]===ed&&ms.includes(x[0]));
+  const hy=r.reduce((a,x)=>a+x[4],0), rn=rd.reduce((a,x)=>a+x[2],0);
+  return {ed,hy,rn,tot:hy+rn,ppl:new Set(r.map(x=>x[5]!=null?'r'+x[5]:x[2])).size,reports:rd.length};
+}
+
+/* ---------- 출력 버튼 ---------- */
+const tools = (title,hint,id) => `<div class="tools"><div><h2>${title}</h2>${hint?`<p class="hint" style="margin:0">${hint}</p>`:''}</div>
+  <div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" data-xlsx="${id}">엑셀 저장</button><button class="btn" data-print>인쇄</button><button class="btn" data-print title="인쇄 창에서 'PDF로 저장'을 고르세요">PDF 저장</button></div></div>`;
+let xlsxReady=null;
+function loadXLSX(){ if(window.XLSX) return Promise.resolve(); if(!xlsxReady) xlsxReady=new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=ok;s.onerror=()=>no(new Error('엑셀 기능을 불러오지 못했어요. 인터넷 연결을 확인해 주세요.'));document.head.appendChild(s);}); return xlsxReady; }
+document.addEventListener('click', async e=>{
+  const x=e.target.closest('[data-xlsx]'), p=e.target.closest('[data-print]');
+  if(p){ window.print(); return; }
+  if(!x) return;
+  try{ await loadXLSX(); }catch(err){ alert(err.message); return; }
+  const page=PAGES.find(q=>q.id===S.page), t=document.getElementById(x.dataset.xlsx);
+  const cond = page.period ? document.getElementById('f-sum').textContent : '';
+  const ws=XLSX.utils.aoa_to_sheet([[`${page.name} — ${x.closest('.tools').querySelector('h2').textContent}`],[`조회 조건: ${cond||'-'} · 데이터 기준 ${D.updated}`],[]]);
+  XLSX.utils.sheet_add_dom(ws, t, {origin:'A4'});
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '자료');
+  XLSX.writeFile(wb, `${page.name}_${(cond||'전체').replace(/[\\/:*?"<>|, ]+/g,'')}_.xlsx`);
+});
+const phdr = page => `<div class="phdr">${esc(page.name)} · 조회 조건: ${esc(page.period?document.getElementById('f-sum').textContent:'-')} · 데이터 기준 ${esc(D.updated)} · 출력 ${new Date().toLocaleString('ko-KR')}</div>`;
+
+/* ---------- 1. 월별 교육현황 ---------- */
+function p1(main){
+  const ms=selMonths(), A=ms.map(monthAgg);
+  const tot=A.reduce((a,x)=>a+x.tot,0), hy=A.reduce((a,x)=>a+x.hy,0), rn=A.reduce((a,x)=>a+x.rn,0), pp=A.reduce((a,x)=>a+x.nn+x.mv+x.et,0);
+  main.insertAdjacentHTML('beforeend',`
+  <div class="kpis">
+    <div class="kpi"><div class="lab">총 교육시간</div><div class="val num">${fmtH(tot)}<small>시간</small></div><div class="sub">${fmt(tot)}분 · ${ms.length}개월</div></div>
+    <div class="kpi"><div class="lab">월평균 교육시간</div><div class="val num">${fmtH(tot/ms.length)}<small>시간</small></div><div class="sub">월 ${fmt(tot/ms.length)}분</div></div>
+    <div class="kpi"><div class="lab">교육대상자 연인원</div><div class="val num">${fmt(pp)}<small>명</small></div><div class="sub">월평균 ${fmt(pp/ms.length)}명</div></div>
+    <div class="kpi"><div class="lab">부서라운딩 비율</div><div class="val num">${(tot?rn/tot*100:0).toFixed(1)}<small>%</small></div><div class="sub">라운딩 ${fmtH(rn)}시간 / 총 ${fmtH(tot)}시간</div></div>
+  </div>
+  <div class="grid2">
+    <section class="card"><h2>월별 교육시간</h2><p class="hint">막대 위 숫자는 총 교육시간(시간)</p>${legend([['--c-HY','현장교육'],['--c-RD','부서라운딩']])}<div class="chart-wrap" id="g1"></div></section>
+    <section class="card"><h2>월별 교육대상자 수</h2><p class="hint">그 달 교육받은 사람 수(교육간호사가 달라도 1명)</p>${legend([['--c-NEW','신규간호사'],['--c-MV','부서이동자'],['--c-ETC','기타 간호사']])}<div class="chart-wrap" id="g2"></div></section>
+  </div>
+  <section class="card">${tools('월별 상세','교육간호사 수는 그 달 업무보고를 제출한 인원','t1')}
+    <div class="tw" style="margin-top:10px"><table id="t1"><thead><tr><th>기준월</th><th>교육간호사</th><th><span class="cdot" style="--cc:var(--c-NEW)"></span>신규간호사</th><th><span class="cdot" style="--cc:var(--c-MV)"></span>부서이동자</th><th><span class="cdot" style="--cc:var(--c-ETC)"></span>기타</th><th><span class="cdot" style="--cc:var(--c-HY)"></span>현장교육(분)</th><th><span class="cdot" style="--cc:var(--c-RD)"></span>부서라운딩(분)</th><th class="tot">총 교육시간(분)</th><th>총 교육시간(시간)</th></tr></thead>
+    <tbody>${A.map(x=>`<tr><th>${ml(x.m)}</th><td class="num">${x.eds}</td><td class="num">${z(x.nn)}</td><td class="num">${z(x.mv)}</td><td class="num">${z(x.et)}</td><td class="num">${fmt(x.hy)}</td><td class="num">${z(x.rn)}</td><td class="num tot">${fmt(x.tot)}</td><td class="num">${fmtH(x.tot)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr class="sum"><th>합계</th><td></td><td></td><td></td><td></td><td class="num">${fmt(hy)}</td><td class="num">${fmt(rn)}</td><td class="num tot">${fmt(tot)}</td><td class="num">${fmtH(tot)}</td></tr></tfoot></table></div></section>`);
+  const fh=v=>v.toLocaleString('ko-KR',{maximumFractionDigits:1})+'시간';
+  vbar(document.getElementById('g1'),ms.map(ml),[{name:'현장교육',c:'--c-HY',values:A.map(x=>x.hy/60)},{name:'부서라운딩',c:'--c-RD',values:A.map(x=>x.rn/60)}],{ft:fh,fy:v=>fmt(v)+'h',aria:'월별 교육시간'});
+  vbar(document.getElementById('g2'),ms.map(ml),[{name:'신규간호사',c:'--c-NEW',values:A.map(x=>x.nn)},{name:'부서이동자',c:'--c-MV',values:A.map(x=>x.mv)},{name:'기타 간호사',c:'--c-ETC',values:A.map(x=>x.et)}],{ft:v=>fmt(v)+'명',aria:'월별 교육대상자 수'});
+}
+
+/* ---------- 2. 교육간호사별 ---------- */
+function p2(main){
+  const ms=selMonths();
+  const A=EDS.map(e=>edAgg(e,ms)).filter(a=>a.reports).sort((a,b)=>b.tot-a.tot);
+  if(!S.ed||!A.find(a=>a.ed===S.ed)) S.ed=A[0]&&A[0].ed;
+  const sum=A.reduce((a,x)=>a+x.tot,0);
+  main.insertAdjacentHTML('beforeend',`
+  <div class="kpis">
+    <div class="kpi"><div class="lab">보고서 제출 교육간호사</div><div class="val num">${A.length}<small>명</small></div><div class="sub">조회 기간 기준</div></div>
+    <div class="kpi"><div class="lab">1인당 총 교육시간</div><div class="val num">${fmtH(A.length?sum/A.length:0)}<small>시간</small></div><div class="sub">조회 기간 합계 평균</div></div>
+    <div class="kpi"><div class="lab">1인당 월평균</div><div class="val num">${fmtH(A.reduce((a,x)=>a+x.tot,0)/Math.max(1,A.reduce((a,x)=>a+x.reports,0)))}<small>시간</small></div><div class="sub">보고서 1건당 평균</div></div>
+    <div class="kpi"><div class="lab">교육대상자 최다</div><div class="val num">${A.length?Math.max(...A.map(a=>a.ppl)):0}<small>명</small></div><div class="sub">${esc((A.slice().sort((a,b)=>b.ppl-a.ppl)[0]||{}).ed||'')}</div></div>
+  </div>
+  <div class="grid2">
+    <section class="card"><h2>교육간호사별 총 교육시간</h2><p class="hint">막대를 누르면 아래에 그 교육간호사 상세가 열려요 (시간)</p>${legend([['--c-HY','현장교육'],['--c-RD','부서라운딩']])}<div class="chart-wrap" id="g3"></div></section>
+    <section class="card">${tools('월별 총 교육시간','단위 분. 행을 누르면 상세가 바뀌어요','t2')}
+      <div class="tw tl" style="margin-top:10px"><table id="t2"><thead><tr><th>교육간호사</th>${ms.map(m=>`<th style="text-align:right">${ml(m)}</th>`).join('')}<th class="tot" style="text-align:right">합계</th></tr></thead>
+      <tbody>${A.map(a=>`<tr data-ed="${esc(a.ed)}" title="누르면 상세 보기"><th>${a.ed===S.ed?`<span class="chg">${esc(a.ed)}</span>`:esc(a.ed)}</th>${ms.map(m=>{const x=edAgg(a.ed,[m]);return `<td class="r num">${x.reports?fmt(x.tot):'–'}</td>`;}).join('')}<td class="r num tot">${fmt(a.tot)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr class="sum"><th>합계</th>${ms.map(m=>`<td class="r num">${fmt(monthAgg(m).tot)}</td>`).join('')}<td class="r num tot">${fmt(sum)}</td></tr></tfoot></table></div></section>
+  </div>
+  <section class="card" id="edd"></section>`);
+  hbar(document.getElementById('g3'),A.map(a=>a.ed),[{name:'현장교육',c:'--c-HY',values:A.map(a=>a.hy/60)},{name:'부서라운딩',c:'--c-RD',values:A.map(a=>a.rn/60)}],
+    {ft:v=>v.toLocaleString('ko-KR',{maximumFractionDigits:1})+'시간',fx:v=>Math.round(v)+'h',sel:S.ed,click:k=>{S.ed=k;render();},aria:'교육간호사별 총 교육시간'});
+  document.querySelectorAll('#t2 tr[data-ed]').forEach(tr=>tr.onclick=()=>{S.ed=tr.dataset.ed;render();});
+  // 상세
+  const ed=S.ed; if(!ed) return; const a=edAgg(ed,ms);
+  const per={}; D.recs.filter(x=>x[1]===ed&&ms.includes(x[0])).forEach(x=>{const k=x[5]!=null?'r'+x[5]:x[2]+'|'+x[3];(per[k]=per[k]||{name:x[2],type:x[3],rid:x[5],min:0,mm:new Set()}).min+=x[4];per[k].mm.add(x[0]);});
+  const list=Object.values(per).sort((p,q)=>q.min-p.min);
+  const dp=D.dept.filter(d=>d[1]===ed&&ms.includes(d[0])).sort((p,q)=>p[0]<q[0]?1:-1)[0];
+  const box=document.getElementById('edd');
+  box.innerHTML=`<div class="hd-row"><div><h2>${esc(ed)} 상세</h2><p class="hint">담당부서 ${dp?esc(dp[3])+' ('+ml(dp[0])+' 기준)':'–'} · 보고서 ${a.reports}개월 · 교육대상자 ${a.ppl}명 · 총 ${fmt(a.tot)}분</p></div>
+    <select id="edpick" aria-label="교육간호사 선택">${A.map(x=>`<option ${x.ed===ed?'selected':''}>${esc(x.ed)}</option>`).join('')}</select></div>
+    <div class="grid2" style="margin-top:6px"><div>${legend([['--c-HY','현장교육'],['--c-RD','부서라운딩']])}<div class="chart-wrap" id="g4"></div></div>
+    <div>${tools('교육대상자 목록','교육시간 많은 순','t3')}<div class="tw tl" style="margin-top:10px;max-height:340px"><table id="t3"><thead><tr><th>교육대상자</th><th>구분</th><th>부서·발령</th><th style="text-align:right">교육월</th><th style="text-align:right">교육시간(분)</th></tr></thead><tbody>${
+      list.map(p=>{const r=p.rid!=null?roster[p.rid]:null;return `<tr><td>${esc(p.name)} ${r&&r.resign?'<span class="st plan">사직</span>':''}</td><td>${p.type==='신규'?'신규간호사':p.type==='이동'?'부서이동자':'기타 간호사'}</td><td>${r?esc(r.dept)+' · '+r.start.slice(2,7).replace('-','.'):'<span class="note">명단 외</span>'}</td><td class="r num">${p.mm.size}</td><td class="r num"><b>${fmt(p.min)}</b></td></tr>`;}).join('')}</tbody></table></div></div></div>`;
+  document.getElementById('edpick').onchange=e=>{S.ed=e.target.value;render();};
+  const rows=ms.map(m=>edAgg(ed,[m]));
+  vbar(document.getElementById('g4'),ms.map(ml),[{name:'현장교육',c:'--c-HY',values:rows.map(x=>x.hy)},{name:'부서라운딩',c:'--c-RD',values:rows.map(x=>x.rn)}],{ft:v=>fmt(v)+'분',aria:ed+' 월별 교육시간'});
+}
+
+/* ---------- 3. 현장교육 세부분석 ---------- */
+function p3(main){
+  const ms=selMonths();
+  const cc=['--c-K1','--c-K2','--c-K3','--c-K4'];
+  main.insertAdjacentHTML('beforeend',`
+  <section class="card"><h2>발령 개월차별 1인당 평균 현장교육 시간</h2>
+    <p class="hint">비교할 발령 차수를 고르세요(최대 4개). 그 개월차에 교육받은 신규간호사 기준 평균(분). 자료가 2026년 3월부터라 그 이전 발령 차수는 중간 개월차부터 보여요. 조회 기간과 관계없이 전체 기간 기준.</p>
+    <div class="seg" id="kc" style="margin-bottom:10px"><span class="gl">발령 차수</span>${COHORTS.map(c=>`<button class="chip" data-c="${c}" aria-pressed="${S.cohorts.includes(c)}">${cohortName(c)}</button>`).join('')}</div>
+    <div id="kl"></div><div class="chart-wrap" id="g5"></div></section>
+  <div class="grid2">
+    <section class="card"><h2>부서별 신규간호사 1인당 교육시간</h2><p class="hint">조회 기간, 그 기간 교육받은 신규간호사 기준 평균(분)</p><div class="chart-wrap" id="g6"></div></section>
+    <section class="card"><h2>재직·사직 신규간호사 비교 (참고)</h2><p class="hint">2026년 발령자, 발령 1~3개월차 1인당 평균 현장교육 시간</p><div id="ret"></div>
+      <div class="callout" style="margin-top:12px">사직자는 근무기간이 짧아 교육받은 개월 수가 적을 수 있어요. 원인 해석보다 추이 확인용으로 보세요.</div></section>
+  </div>
+  <section class="card">${tools('신규간호사별 개월차 교육시간','단위 분. 조회 기간과 관계없이 전체 기간','t4')}
+    <div class="seg" style="margin:10px 0"><span class="gl">발령 차수</span><select id="ncs" class="pr" style="height:34px;border:1px solid var(--line2);border-radius:10px;padding:0 10px;background:var(--surface);color:var(--ink)">${COHORTS.slice().reverse().map(c=>`<option value="${c}" ${c===S.nCohort?'selected':''}>${cohortName(c)}</option>`).join('')}</select>
+      <span class="gl" style="margin-left:8px">부서</span><select id="nds" style="height:34px;border:1px solid var(--line2);border-radius:10px;padding:0 10px;background:var(--surface);color:var(--ink)"></select></div>
+    <div class="tw"><table id="t4"></table></div></section>`);
+  document.querySelectorAll('#kc [data-c]').forEach(b=>b.onclick=()=>{const c=b.dataset.c;let s=S.cohorts;if(s.includes(c))s=s.filter(x=>x!==c);else{if(s.length>=4)s=s.slice(1);s=s.concat(c).sort();}S.cohorts=s;render();});
+  // 개월차 곡선
+  const series=S.cohorts.map((c,i)=>{const by={};nurseRecs.filter(x=>cohortOf(x[5])===c).forEach(x=>{const k=kOf(x[5],x[0]);(by[k]=by[k]||{})[x[5]]=(by[k][x[5]]||0)+x[4];});
+    const vals=[...Array(18)].map((_,j)=>{const v=by[j+1]?Object.values(by[j+1]):[];return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):null;});
+    return {name:cohortName(c),c:cc[i],values:vals,n:[...Array(18)].map((_,j)=>by[j+1]?Object.keys(by[j+1]).length:0)};});
+  let lastK=1; series.forEach(s=>s.values.forEach((v,j)=>{if(v!=null)lastK=Math.max(lastK,j+1);}));
+  series.forEach(s=>{s.values=s.values.slice(0,lastK);});
+  document.getElementById('kl').innerHTML=legend(series.map(s=>[s.c,s.name]));
+  line(document.getElementById('g5'),[...Array(lastK)].map((_,j)=>String(j+1)),series,{aria:'발령 개월차별 평균 교육시간'});
+  // 부서별
+  const dp={}; nurseRecs.filter(x=>ms.includes(x[0])).forEach(x=>{const d=roster[x[5]].dept;(dp[d]=dp[d]||{min:0,ids:new Set()}).min+=x[4];dp[d].ids.add(x[5]);});
+  const DA=Object.entries(dp).map(([d,v])=>({d,avg:v.min/v.ids.size,n:v.ids.size})).sort((a,b)=>b.avg-a.avg);
+  hbar(document.getElementById('g6'),DA.map(x=>x.d),[{name:'1인당 평균',c:'--c-HY',values:DA.map(x=>Math.round(x.avg))}],{rowH:22,L:56,ft:v=>fmt(v)+'분',aria:'부서별 1인당 교육시간'});
+  // 재직·사직
+  const grp={재직:{},사직:{}};
+  nurseRecs.forEach(x=>{const r=roster[x[5]];if(!r.start.startsWith('2026'))return;const k=kOf(x[5],x[0]);if(k<1||k>3)return;const g=r.resign?'사직':'재직';grp[g][x[5]]=(grp[g][x[5]]||0)+x[4];});
+  const st=g=>{const v=Object.values(grp[g]);return {n:v.length,avg:v.length?v.reduce((a,b)=>a+b,0)/v.length:0};}, s1=st('재직'), s2=st('사직');
+  document.getElementById('ret').innerHTML=`<div class="ret"><div class="b"><div class="fl">재직 중</div><div class="n num">${fmt(s1.avg)}<small>분</small></div><div class="note">${s1.n}명 평균</div></div><div class="b"><div class="fl">사직</div><div class="n num">${fmt(s2.avg)}<small>분</small></div><div class="note">${s2.n}명 평균</div></div></div>`;
+  // 신규간호사 표
+  const ncs=document.getElementById('ncs'), nds=document.getElementById('nds');
+  ncs.onchange=()=>{S.nCohort=ncs.value;S.nDept='';render();}; nds.onchange=()=>{S.nDept=nds.value;render();};
+  const ids=[...new Set(nurseRecs.filter(x=>cohortOf(x[5])===S.nCohort).map(x=>x[5]))];
+  const depts=[...new Set(ids.map(i=>roster[i].dept))].sort((a,b)=>a.localeCompare(b,'ko',{numeric:true}));
+  nds.innerHTML='<option value="">전체 부서</option>'+depts.map(d=>`<option ${d===S.nDept?'selected':''}>${esc(d)}</option>`).join('');
+  const sel=ids.filter(i=>!S.nDept||roster[i].dept===S.nDept).sort((a,b)=>roster[a].dept.localeCompare(roster[b].dept,'ko',{numeric:true})||roster[a].name.localeCompare(roster[b].name,'ko'));
+  const cell={}; let maxK=1;
+  nurseRecs.filter(x=>sel.includes(x[5])).forEach(x=>{const k=kOf(x[5],x[0]);cell[x[5]+'|'+k]=(cell[x[5]+'|'+k]||0)+x[4];maxK=Math.max(maxK,k);});
+  const ks=[...Array(maxK)].map((_,i)=>i+1), colT=ks.map(k=>sel.reduce((a,i)=>a+(cell[i+'|'+k]||0),0));
+  document.getElementById('t4').innerHTML=`<thead><tr><th>성명</th><th style="text-align:left">부서</th>${ks.map(k=>`<th>${k}개월차</th>`).join('')}<th class="tot">합계</th></tr></thead><tbody>`+
+    sel.map(i=>{const r=roster[i];let t=0;return `<tr><th>${esc(r.name)} ${r.resign?`<span class="st plan" title="사직일 ${esc(r.resign)}">사직 ${esc(r.resign.slice(5).replace('-','/'))}</span>`:''}</th><td style="text-align:left">${esc(r.dept)}</td>${ks.map(k=>{const v=cell[i+'|'+k]||0;t+=v;return `<td class="num">${z(v)}</td>`;}).join('')}<td class="num tot">${fmt(t)}</td></tr>`;}).join('')+
+    `</tbody><tfoot><tr class="sum"><th>합계 (${sel.length}명)</th><td></td>${colT.map(v=>`<td class="num">${z(v)}</td>`).join('')}<td class="num tot">${fmt(colT.reduce((a,b)=>a+b,0))}</td></tr></tfoot>`;
+}
+
+/* ---------- 4. 담당부서 관리 ---------- */
+function p4(main){
+  const eds=[...new Set(D.dept.map(d=>d[1]))].sort((a,b)=>a.localeCompare(b,'ko'));
+  const get=(e,m)=>{const r=D.dept.find(d=>d[1]===e&&d[0]===m);return r?r[3]:'';};
+  const norm=s=>s.split(',').map(x=>x.trim()).sort().join(',');
+  const lm=DMS[DMS.length-1];
+  const owner={}; D.dept.filter(d=>d[0]===lm).forEach(d=>d[3].split(',').map(x=>x.trim()).forEach(u=>(owner[u]=owner[u]||[]).push(d[1])));
+  const alias={OR:['OR','수술실'],ER:['ER','응급실']}, uds=u=>alias[u]||[u], end=lm+'-31';
+  const units=Object.keys(owner).sort((a,b)=>a.localeCompare(b,'ko',{numeric:true})).map(u=>{const ds=uds(u);
+    return {u,own:owner[u],act:roster.filter(r=>ds.includes(r.dept)&&r.start<=end&&kOf(r.id,lm)<=12&&(!r.resign||r.resign>end)).length,
+      min:nurseRecs.filter(x=>x[0]===lm&&ds.includes(roster[x[5]].dept)).reduce((a,x)=>a+x[4],0)};});
+  const changes=[];
+  DMS.forEach((m,i)=>{ if(!i) return; const pm=DMS[i-1]; eds.forEach(e=>{const v=get(e,m),p=get(e,pm);
+    if(v&&p&&norm(v)!==norm(p)){const a=v.split(',').map(x=>x.trim()),b=p.split(',').map(x=>x.trim());changes.push([m,e,a.filter(x=>!b.includes(x)),b.filter(x=>!a.includes(x)),'']);}
+    else if(v&&!p) changes.push([m,e,v.split(',').map(x=>x.trim()),[],'담당 시작']);
+    else if(!v&&p) changes.push([m,e,[],p.split(',').map(x=>x.trim()),'담당 종료']); }); });
+  main.insertAdjacentHTML('beforeend',`
+  <div class="kpis">
+    <div class="kpi"><div class="lab">담당 교육간호사</div><div class="val num">${owner?new Set(Object.values(owner).flat()).size:0}<small>명</small></div><div class="sub">${ml(lm)} 결재문서 기준</div></div>
+    <div class="kpi"><div class="lab">담당 부서</div><div class="val num">${units.length}<small>개</small></div><div class="sub">교육간호사가 배정된 부서</div></div>
+    <div class="kpi"><div class="lab">1년 이내 재직 신규간호사</div><div class="val num">${units.reduce((a,u)=>a+u.act,0)}<small>명</small></div><div class="sub">담당 부서 합계</div></div>
+    <div class="kpi"><div class="lab">담당부서 변경</div><div class="val num">${changes.length}<small>건</small></div><div class="sub">${ml(DMS[0])}~${ml(lm)} 직전 달 대비</div></div>
+  </div>
+  <section class="card">${tools('교육간호사 × 월 담당부서','<span class="chg">파란 글씨</span>는 직전 달과 담당부서가 달라진 달','t5')}
+    <div class="tw" style="margin-top:10px"><table id="t5"><thead><tr><th>교육간호사</th>${DMS.map(m=>`<th style="text-align:center">${ml(m)}</th>`).join('')}</tr></thead><tbody>${
+      eds.map(e=>`<tr><th>${esc(e)}</th>${DMS.map((m,i)=>{const v=get(e,m),p=i?get(e,DMS[i-1]):v;const ch=i&&v&&((p&&norm(v)!==norm(p))||(!p&&DMS.slice(0,i).some(x=>get(e,x))));return `<td style="text-align:center">${v?(ch?`<span class="chg">${esc(v)}</span>`:esc(v)):'–'}</td>`;}).join('')}</tr>`).join('')}</tbody></table></div></section>
+  <div class="grid2">
+    <section class="card">${tools(`부서별 현황 <span class="note" style="font-weight:500">${ml(lm)} 기준</span>`,'재직 신규 = 발령 12개월 이내이면서 사직하지 않은 신규간호사','t6')}
+      <div class="tw" style="margin-top:10px"><table id="t6"><thead><tr><th>부서</th><th style="text-align:left">담당 교육간호사</th><th>재직 신규(명)</th><th>신규 현장교육(분)</th></tr></thead><tbody>${
+        units.map(x=>`<tr><th>${esc(x.u)}</th><td style="text-align:left">${x.own.map(esc).join(', ')}</td><td class="num">${z(x.act)}</td><td class="num">${z(x.min)}</td></tr>`).join('')}</tbody>
+        <tfoot><tr class="sum"><th>합계</th><td></td><td class="num">${units.reduce((a,u)=>a+u.act,0)}</td><td class="num">${fmt(units.reduce((a,u)=>a+u.min,0))}</td></tr></tfoot></table></div></section>
+    <section class="card"><h2>담당부서 변경 이력</h2><p class="hint">직전 달 결재문서와 비교</p>${
+      changes.map(c=>`<div class="tline"><div class="m">${ml(c[0])}</div><div><b>${esc(c[1])}</b> ${c[4]?`<span class="note">${c[4]}</span> `:''}${c[2].map(x=>`<span class="st add">+ ${esc(x)}</span>`).join(' ')} ${c[3].map(x=>`<span class="st out">${esc(x)}</span>`).join(' ')}</div></div>`).join('')||'<p class="note">변경 이력이 없어요</p>'}</section>
+  </div>`);
+}
+
+/* ---------- 5. 사업신고 인력 관리 ---------- */
+function p5(main){
+  const m=S.bizMonth;
+  const cnt=(mm,b)=>D.biz.filter(x=>x[0]===mm&&x[1]===b&&x[6]==='신고').length;
+  const okM=mm=>BIZ.every(b=>cnt(mm,b)===D.bizStd[b]);
+  const chM=mm=>D.biz.filter(x=>x[0]===mm&&(x[7]==='추가'||x[7]==='제외')).length;
+  const stdSum=BIZ.reduce((a,b)=>a+D.bizStd[b],0);
+  main.insertAdjacentHTML('beforeend',`
+  <div class="card tools" style="padding:14px 20px"><div class="seg"><span class="gl">기준월</span>${BMS.map(mm=>`<button class="chip" data-bm="${mm}" aria-pressed="${mm===m}">${ml(mm)}</button>`).join('')}</div></div>
+  <div class="kpis">
+    <div class="kpi"><div class="lab">${ml(m)} 신고 인원</div><div class="val num">${BIZ.reduce((a,b)=>a+cnt(m,b),0)}<small>/ ${stdSum}명</small></div><div class="sub">${okM(m)?'사업별 기준 인원 충족':'기준 인원과 다름 — 확인 필요'}</div></div>
+    ${BIZ.map(b=>`<div class="kpi"><div class="lab">${BIZ_SHORT[b]==='통합'?'간호간병':BIZ_SHORT[b]==='교대제'?'교대제 개선':'필수의료'}</div><div class="val num">${cnt(m,b)}<small>/ ${D.bizStd[b]}명</small></div><div class="sub">${cnt(m,b)===D.bizStd[b]?'정상':'확인 필요'}</div></div>`).join('')}
+  </div>
+  <div class="bizcards">${BIZ.map(b=>{const rows=D.biz.filter(x=>x[0]===m&&x[1]===b);const act=rows.filter(x=>x[6]==='신고').sort((p,q)=>(p[2].startsWith('교육전담')?0:1)-(q[2].startsWith('교육전담')?0:1)||p[3].localeCompare(q[3],'ko'));const ok=act.length===D.bizStd[b];
+    return `<section class="card"><h2 style="--accent:var(${BIZ_C[b]})">${esc(b)}</h2><p class="hint"><span class="okline ${ok?'':'bad'}"><i></i>${ok?'정상':'확인 필요'}</span> · 기준 ${D.bizStd[b]}명 · 신고 ${act.length}명</p>
+      ${act.map(x=>`<div class="mem"><b>${esc(x[3])}</b><span><span class="st done">${esc(x[2].replace('(간호간병)',''))}</span>${x[7]==='추가'?' <span class="st add">추가</span>':''}${x[9]?' <span class="st">'+esc(x[9])+'</span>':''}</span></div>`).join('')}
+      ${rows.filter(x=>x[6]==='제외').map(x=>`<div class="mem out"><b>${esc(x[3])}</b><span class="st out">제외</span></div>`).join('')}</section>`;}).join('')}</div>
+  <div class="grid2">
+    <section class="card">${tools('월별 신고 인원 점검','기준 인원과 다르면 확인 필요','t7')}
+      <div class="tw" style="margin-top:10px"><table id="t7"><thead><tr><th>기준월</th>${BIZ.map(b=>`<th><span class="cdot" style="--cc:var(${BIZ_C[b]})"></span>${BIZ_SHORT[b]}</th>`).join('')}<th class="tot">합계</th><th>변동</th><th style="text-align:center">점검</th></tr></thead><tbody>
+      <tr><th class="note">기준</th>${BIZ.map(b=>`<td class="num note">${D.bizStd[b]}</td>`).join('')}<td class="num tot note">${stdSum}</td><td></td><td></td></tr>
+      ${BMS.map(mm=>`<tr><th>${mm===m?`<span class="chg">${ml(mm)}</span>`:ml(mm)}</th>${BIZ.map(b=>`<td class="num">${cnt(mm,b)}</td>`).join('')}<td class="num tot">${BIZ.reduce((a,b)=>a+cnt(mm,b),0)}</td><td class="num">${chM(mm)?chM(mm)+'건':'<span class="zero">·</span>'}</td><td style="text-align:center"><span class="okline ${okM(mm)?'':'bad'}"><i></i>${okM(mm)?'정상':'확인'}</span></td></tr>`).join('')}</tbody></table></div></section>
+    <section class="card"><h2>변동 이력</h2><p class="hint">추가·제외가 있었던 달 (최근 순)</p>${
+      BMS.filter(chM).reverse().map(mm=>`<div class="tline"><div class="m">${ml(mm)}</div><div>${BIZ.map(b=>{const ad=D.biz.filter(x=>x[0]===mm&&x[1]===b&&x[7]==='추가'),rm=D.biz.filter(x=>x[0]===mm&&x[1]===b&&x[7]==='제외');if(!ad.length&&!rm.length)return '';
+        const why=[...new Set(ad.concat(rm).map(x=>x[8]||x[9]).filter(Boolean))].join(' / ');
+        return `<div style="margin-bottom:4px"><span class="kc" style="--cc:var(${BIZ_C[b]})"><i></i>${BIZ_SHORT[b]}</span> ${rm.map(x=>`<span class="st out">${esc(x[3])}</span>`).join(' ')} → ${ad.map(x=>`<span class="st add">${esc(x[3])}</span>`).join(' ')}${why?`<div class="note">${esc(why)}</div>`:''}</div>`;}).join('')}</div></div>`).join('')}</section>
+  </div>
+  <section class="card">${tools('인력별 월간 신고 현황','통합 = 간호간병, 교대제 = 교대제 개선, 필수 = 필수의료. 굵은 글씨는 교육전담 역할, <span class="chg">파란 글씨</span>는 직전 달과 달라진 달','t8')}
+    <div class="tw" style="margin-top:10px"><table id="t8"></table></div></section>`);
+  document.querySelectorAll('[data-bm]').forEach(b=>b.onclick=()=>{S.bizMonth=b.dataset.bm;render();});
+  const people=[...new Set(D.biz.map(x=>x[3]))];
+  const cellOf=(p,mm)=>D.biz.filter(x=>x[3]===p&&x[0]===mm&&x[6]==='신고').map(x=>x[2].startsWith('교육전담')&&!x[2].includes('간호간병')?`<b>${BIZ_SHORT[x[1]]}</b>`:BIZ_SHORT[x[1]]).join(', ');
+  const ord=p=>{const f=D.biz.find(x=>x[3]===p&&x[6]==='신고');return BIZ.indexOf(f?f[1]:'');};
+  people.sort((a,b)=>ord(a)-ord(b)||a.localeCompare(b,'ko'));
+  document.getElementById('t8').innerHTML=`<thead><tr><th>성명</th>${BMS.map(mm=>`<th style="text-align:center">${ml(mm)}</th>`).join('')}</tr></thead><tbody>`+
+    people.map(p=>`<tr><th>${esc(p)}</th>${BMS.map((mm,i)=>{const v=cellOf(p,mm),pv=i?cellOf(p,BMS[i-1]):v;return `<td style="text-align:center">${v?(i&&v!==pv?`<span class="chg">${v}</span>`:v):(i&&pv?'<span class="out-n">제외</span>':'–')}</td>`;}).join('')}</tr>`).join('')+'</tbody>';
+}
+
+/* ---------- 라우팅·렌더 ---------- */
+function route(){ const id=(location.hash||'#p1').slice(1); S.page=PAGES.some(p=>p.id===id)?id:'p1'; render(); window.scrollTo({top:0}); }
+function render(){
+  charts.length=0;
+  const page=PAGES.find(p=>p.id===S.page);
+  nav.querySelectorAll('.navbtn').forEach(b=>{ if(b.dataset.p===S.page) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
+  syncFilter(page);
+  const main=document.getElementById('main');
+  main.innerHTML=phdr(page)+`<div class="head"><h1>${esc(page.name)}</h1><p>${esc(page.desc)}</p></div>`;
+  ({p1,p2,p3,p4,p5})[S.page](main);
+  document.title=page.name+' · 간호교육팀 운영 대시보드';
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);
+route();
+};
+</script>
+<script>
+/* ---------- 로그인 · 데이터 불러오기 ---------- */
+(function(){
+const API = window.OPS_API, GCID = window.OPS_GOOGLE_CLIENT_ID;
+const $ = id => document.getElementById(id);
+const store = { get:k=>{try{return sessionStorage.getItem(k);}catch(_){return null;}}, set:(k,v)=>{try{sessionStorage.setItem(k,v);}catch(_){}}, del:k=>{try{sessionStorage.removeItem(k);}catch(_){}} };
+let booted = false;
+async function call(body){
+  let last;
+  for (let i=0;i<2;i++){ // 첫 호출이 실패하는 경우가 있어 한 번 재시도
+    try{
+      const r = await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)});
+      const j = JSON.parse(await r.text());
+      if (j.ok===false) throw Object.assign(new Error(j.error||'요청 실패'),{auth:true});
+      return j;
+    }catch(e){ last=e; if(e.auth) break; await new Promise(r=>setTimeout(r,800)); }
+  }
+  throw last.auth ? last : new Error('서버에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+}
+function showLogin(msg, which){ $('loading').hidden=true; $('login').hidden=false; document.body.classList.add('locked'); if(msg) $(which||'lgerr').textContent=msg; initGoogle(); }
+async function load(cred, fresh){
+  $('loading').hidden=false;
+  const j = await call(Object.assign({action:'data',fresh:!!fresh},cred));
+  $('login').hidden=true; $('loading').hidden=true; document.body.classList.remove('locked');
+  if (booted){ location.reload(); return; }
+  booted = true; window.bootApp(j.data, j.who);
+}
+function cred(){ const t=store.get('ops_token'), g=store.get('ops_id'); return t?{token:t}:g?{idToken:g}:null; }
+window.opsReload = async ()=>{ const c=cred(); if(!c){ location.reload(); return; } try{ $('loading').hidden=false; const j=await call(Object.assign({action:'data',fresh:true},c)); store.set('ops_cache_ok','1'); location.reload(); }catch(e){ $('loading').hidden=true; alert(e.message); } };
+$('logout').onclick = ()=>{ store.del('ops_token'); store.del('ops_id'); location.reload(); };
+$('pwform').onsubmit = async e=>{ e.preventDefault(); $('lgerr').textContent=''; const pw=$('pw').value.trim(); if(!pw) return;
+  try{ await load({token:pw}); store.set('ops_token',pw); }catch(err){ showLogin(err.message,'lgerr'); } };
+let gReady=false;
+function initGoogle(){
+  if (gReady || !GCID) { if(!GCID) $('gbtn').innerHTML='<p class="note">구글 로그인이 설정되지 않았습니다.</p>'; return; }
+  gReady=true;
+  const s=document.createElement('script'); s.src='https://accounts.google.com/gsi/client'; s.async=true;
+  s.onload=()=>{ google.accounts.id.initialize({client_id:GCID, callback: async res=>{ $('lgerr2').textContent='';
+      try{ await load({idToken:res.credential}); store.set('ops_id',res.credential); }catch(err){ store.del('ops_id'); showLogin(err.message,'lgerr2'); } }});
+    google.accounts.id.renderButton($('gbtn'),{theme:'outline',size:'large',text:'signin_with',locale:'ko'}); };
+  document.head.appendChild(s);
+}
+(async ()=>{
+  if (!API) { // 백엔드 연결 전(PC 미리보기): 같은 폴더 data.js 사용
+    const s=document.createElement('script'); s.src='data.js';
+    s.onload=()=>{ document.getElementById('logout').hidden=true; window.bootApp(window.EDU_DATA,'미리보기(PC 사본)'); };
+    s.onerror=()=>showLogin('백엔드 주소(config.js 의 OPS_API)가 설정되지 않았습니다.');
+    document.head.appendChild(s); return;
+  }
+  const c=cred();
+  if (!c){ showLogin(); return; }
+  try{ await load(c); }catch(e){ store.del('ops_token'); store.del('ops_id'); showLogin(e.message); }
+})();
+})();
+</script>
+</body>
+</html>
