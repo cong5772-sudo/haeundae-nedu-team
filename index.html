@@ -817,6 +817,16 @@ function p4(main){
   <section class="card">${tools('교육간호사 × 월 담당부서 · 교육대상자','칸 = 담당부서 / 아래 숫자 = 그 달 교육대상자 수 · <span class="chg">파란 글씨</span>는 직전 달과 담당부서가 달라진 달','t5')}
     <div class="tw" style="margin-top:10px"><table id="t5"><thead><tr><th>교육간호사</th>${DMS.map(m=>`<th style="text-align:center">${ml(m)}</th>`).join('')}</tr></thead><tbody>${
       eds.map(e=>`<tr><th>${esc(dn(e))}</th>${DMS.map((m,i)=>{const v=get(e,m),p=i?get(e,DMS[i-1]):v;const ch=i&&v&&((p&&norm(v)!==norm(p))||(!p&&DMS.slice(0,i).some(x=>get(e,x))));const n=cntM(e,m);return `<td style="text-align:center;white-space:normal${m===lm?';background:var(--accent-soft)':''}">${v?(ch?`<span class="chg">${esc(v)}</span>`:esc(v)):'–'}${v?`<div class="note" style="font-weight:600;color:var(--ink2)">${n?n+'명':'–'}</div>`:''}</td>`;}).join('')}</tr>`).join('')}</tbody></table></div></section>
+  <section class="card">${tools('부서 × 월 담당 교육간호사','부서군 순 · <span class="chg">파란 글씨</span>는 직전 달과 담당 교육간호사가 바뀐 달 · 한 부서를 두 명이 맡으면 함께 표시','t5d')}
+    <div class="tw" style="margin-top:10px;max-height:640px"><table id="t5d"><thead><tr><th style="min-width:90px">부서</th>${DMS.map(m=>`<th style="text-align:center">${ml(m)}</th>`).join('')}</tr></thead><tbody>${
+      (()=>{ const own=m=>{ const o={}; D.dept.filter(d=>d[0]===m).forEach(d=>units(d[3]).forEach(u=>{ const k=deptName(u); (o[k]=o[k]||[]).push(d[1]); })); return o; };
+        const OM=Object.fromEntries(DMS.map(m=>[m,own(m)]));
+        const all=[...new Set(DMS.flatMap(m=>Object.keys(OM[m])))].sort((a,b)=>unitRank(a)-unitRank(b));
+        let g0=null, out='';
+        all.forEach(u=>{ const g=groupOfDept(u); if(g!==g0){ out+=`<tr class="grp"><th colspan="${DMS.length+1}">${esc(g)}</th></tr>`; g0=g; }
+          out+=`<tr><th>${esc(u)}</th>${DMS.map((m,i)=>{ const v=(OM[m][u]||[]).slice().sort((a,b)=>ED_ORDER.indexOf(a)-ED_ORDER.indexOf(b)); const pv=i?(OM[DMS[i-1]][u]||[]).slice().sort().join(','):null; const ch=i&&pv!==null&&v.slice().sort().join(',')!==pv;
+            return `<td style="text-align:center${m===lm?';background:var(--accent-soft)':''}">${v.length?(ch?`<span class="chg">${esc(v.map(dn).join(', '))}</span>`:esc(v.map(dn).join(', '))):'<span class="note">–</span>'}</td>`; }).join('')}</tr>`; });
+        return out; })()}</tbody></table></div></section>
   <section class="card"><h2>담당부서 변경 이력</h2><p class="hint">직전 달 결재문서와 비교 · 최근 순</p>${
     changes.slice().reverse().map(c=>`<div class="tline"><div class="m">${ml(c[0])}</div><div><b>${esc(dn(c[1]))}</b> ${c[4]?`<span class="note">${c[4]}</span> `:''}${c[2].map(x=>`<span class="st add">+ ${esc(x)}</span>`).join(' ')} ${c[3].map(x=>`<span class="st out">${esc(x)}</span>`).join(' ')}</div></div>`).join('')||'<p class="note">변경 이력이 없어요</p>'}</section>`);
   main.querySelectorAll('[data-dm]').forEach(b=>b.onclick=()=>{ S.deptMonth=b.dataset.dm; render(); });
