@@ -527,7 +527,7 @@ function pagePrint(btn){
   pan.querySelector('[data-ppgo]').onclick=()=>{ const sel=boxes.filter(b=>b.checked).map(b=>secs[+b.dataset.pp]); if(!sel.length){ alert('출력할 구역을 하나 이상 골라 주세요.'); return; } pan.remove(); printOnly(sel.length===secs.length?null:sel); };
 }
 document.addEventListener('click',e=>{ const b=e.target.closest('[data-pprint]'); if(b){ pagePrint(b); return; } if(!e.target.closest('.pp-wrap')) document.querySelectorAll('.pp-pan').forEach(x=>x.remove()); });
-const phdr = page => `<div class="phdr">${esc(page.name)} · 조회 조건: ${esc(page.period?document.getElementById('f-sum').textContent:'-')}${page.id==='p1'||page.id==='p2'?(S.ljh===false?' · 이진호 제외':' · 이진호 포함'):page.id==='p3'?' · 이진호(전담간호사 교육) 제외':''} · 데이터 기준 ${esc(D.updated)} · 출력 ${new Date().toLocaleString('ko-KR')}</div>`;
+const phdr = page => `<div class="phdr">${esc(page.name)} · 조회 조건: ${esc(page.period?document.getElementById('f-sum').textContent:'-')} · 데이터 기준 ${esc(D.updated)} · 출력 ${new Date().toLocaleString('ko-KR')}</div>`;
 
 /* ---------- 1. 월별 교육현황 ---------- */
 function p1(main){
