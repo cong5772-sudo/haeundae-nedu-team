@@ -463,7 +463,6 @@ function p1(main){
 
 /* ---------- 2. 교육간호사별 ---------- */
 /* ---------- 2. 교육간호사별 ---------- */
-const STD_MIN = 3000;                       /* 교육간호사 1인 월 교육시간 기준(분) */
 const ED_NOTE = {'정미진':'부서이동'};       /* 이름 옆 표기 */
 const EXCLUDED_EDS = ['이진호'];            /* 보고서 정리 제외(현장교육간호사 인원에는 포함) */
 const dn = e => e + (ED_NOTE[e] ? `(${ED_NOTE[e]})` : '');
@@ -477,9 +476,9 @@ const deptsOf = (ed, ms) => { const d=D.dept.filter(x=>x[1]===ed&&ms.includes(x[
 /* 막대(교육시간) + 위쪽 띠(교육대상자 수) — 같은 가로축을 쓰는 두 칸 그래프 */
 function combo(el, labels, bars, cnts, o){
   charts.push(()=>combo(el,labels,bars,cnts,o));
-  el.style.overflowX='auto'; const W=Math.max(60*labels.length+140,el.clientWidth), narrow=false, L=52, R=narrow?12:78, ST=12, SH=58, T=ST+SH+30, H=o.h||330, B=narrow?44:28;
+  el.style.overflowX='auto'; const W=Math.max(60*labels.length+140,el.clientWidth), narrow=false, L=52, R=narrow?12:78, ST=12, SH=110, T=ST+SH+34, H=o.h||400, B=narrow?44:28;
   const ax=axis(Math.max(...bars, o.ref||0)*1.08), y=v=>T+(H-T-B)*(1-v/ax.max), step=(W-L-R)/labels.length, bw=Math.min(52,step*.56);
-  const cmax=Math.max(1,...cnts), cy=v=>ST+SH-(SH-16)*(v/cmax)-8, cx=i=>L+step*i+step/2;
+  const cmax=Math.max(1,...cnts), cy=v=>ST+SH-6-(SH-26)*(v/cmax), cx=i=>L+step*i+step/2;
   let g=`<text x="${L-6}" y="${ST+4}" text-anchor="end" style="fill:var(--muted)">대상자</text><line class="grid" x1="${L}" x2="${W-R}" y1="${ST+SH}" y2="${ST+SH}"/>`;
   for(let i=0;i<=ax.n;i++){ const v=ax.st*i, yy=y(v); g+=`<line class="grid" x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}"/><text x="${L-6}" y="${yy+4}" text-anchor="end">${fmt(v)}</text>`; }
   labels.forEach((lb,i)=>{ const x=cx(i)-bw/2, v=bars[i]||0, y1=y(v), y0=y(0);
@@ -489,7 +488,7 @@ function combo(el, labels, bars, cnts, o){
   if(o.ref!=null){ const yr=y(o.ref); g+=`<line x1="${L}" x2="${W-R+(narrow?0:4)}" y1="${yr}" y2="${yr}" style="stroke:var(--crit);stroke-width:1.5"/>`+(narrow?`<text x="${W-R}" y="${yr-5}" text-anchor="end" style="fill:var(--crit-ink)">기준 ${fmt(o.ref)}분</text>`:`<text x="${W-R+8}" y="${yr+4}" style="fill:var(--crit-ink)">기준 ${fmt(o.ref)}분</text>`); }
   let d=''; cnts.forEach((v,i)=>{ d+=(i?'L':'M')+cx(i)+','+cy(v)+' '; });
   g+=`<path class="ln" d="${d}" stroke="var(--c-N2)"/>`;
-  cnts.forEach((v,i)=>{ g+=`<circle class="bar" cx="${cx(i)}" cy="${cy(v)}" r="13" style="fill:var(--surface);stroke:var(--c-N2);stroke-width:1.5" data-tip="${esc(labels[i])} · 교육대상자 ${o.cntTxt(v)}"/><text x="${cx(i)}" y="${cy(v)+4}" text-anchor="middle" style="fill:var(--ink);font-weight:700;font-size:10.5px;pointer-events:none">${o.cntTxt(v).replace('명','')}</text>`; });
+  cnts.forEach((v,i)=>{ g+=`<circle class="pt bar" cx="${cx(i)}" cy="${cy(v)}" r="5" fill="var(--c-N2)" data-tip="${esc(labels[i])} · 교육대상자 ${o.cntTxt(v)}"/><text x="${cx(i)}" y="${cy(v)-11}" text-anchor="middle" style="fill:var(--ink);font-weight:700;font-size:11.5px;pointer-events:none">${o.cntTxt(v).replace('명','')}</text>`; });
   el.innerHTML=`<svg class="chart" style="max-width:none;width:${W}px;height:${H}px" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(o.aria||'')}">${g}</svg>`;
   if(o.click) el.querySelectorAll('[data-key]').forEach(b=>b.addEventListener('click',()=>o.click(b.dataset.key)));
 }
@@ -520,11 +519,11 @@ function p2(main){
   <div class="kpis">
     <div class="kpi"><div class="lab">교육간호사 구성</div><div class="val num" style="font-size:22px">전담 ${jeondam.length}<small>명</small> · 현장 ${fieldN}<small>명</small></div><div class="sub">${ml(lastM)} 기준 · 교육전담간호사 ${esc(jeondam.join(', '))} · 보고서 정리 ${A.length}명</div></div>
     <div class="kpi"><div class="lab">1인당 총 교육시간</div><div class="val num">${fmt(A.length?sum/A.length:0)}<small>분</small></div><div class="sub">조회 기간 합계의 1인 평균</div></div>
-    <div class="kpi"><div class="lab">1인당 월평균 교육시간</div><div class="val num">${fmt(reps?sum/reps:0)}<small>분</small></div><div class="sub">기준 ${fmt(STD_MIN)}분 · 보고서 1건당</div></div>
+    <div class="kpi"><div class="lab">1인당 월평균 교육시간</div><div class="val num">${fmt(reps?sum/reps:0)}<small>분</small></div><div class="sub">보고서 1건(1개월)당 평균</div></div>
     <div class="kpi"><div class="lab">평균 교육대상자</div><div class="val num">${(reps?pmSum/reps:0).toLocaleString('ko-KR',{maximumFractionDigits:1})}<small>명</small></div><div class="sub">교육간호사 1인 · 월 기준</div></div>
   </div>
-  <section class="card"><div class="hd-row"><div><h2>교육간호사별 교육시간 · 교육대상자</h2><p class="hint">${one?`${ml(lastM)} 값`:'여러 달을 고르면 1인 월평균'}이에요. 위 띠는 교육대상자 수(명), 막대는 교육시간(분), 빨간 선은 월 기준 ${fmt(STD_MIN)}분. 막대를 누르면 개인별 상세가 열려요.</p></div></div>
-    <div class="legend"><span><i style="background:var(--c-HY)"></i>교육시간(분)</span><span><i style="background:none;border:1.5px solid var(--c-N2);border-radius:50%;width:10px;height:10px"></i>교육대상자(명)</span><span><i style="background:var(--crit);height:2px;border-radius:0;vertical-align:3px"></i>기준</span></div>
+  <section class="card"><div class="hd-row"><div><h2>교육간호사별 교육시간 · 교육대상자</h2><p class="hint">${one?`${ml(lastM)} 값`:'여러 달을 고르면 1인 월평균'}이에요. 위 띠는 교육대상자 수(명), 막대는 교육시간(분). 막대를 누르면 개인별 상세가 열려요.</p></div></div>
+    <div class="legend"><span><i style="background:var(--c-HY)"></i>교육시간(분)</span><span><i style="background:var(--c-N2);border-radius:50%;width:8px;height:8px"></i>교육대상자(명)</span></div>
     <div class="chart-wrap" id="g2c"></div>${memo?`<p class="hint" style="margin:6px 0 0">인원 변동: ${esc(memo)}</p>`:''}</section>
   <section class="card">${tools('교육간호사별 교육대상자 구분별 교육시간','인원은 조회 기간의 실인원(같은 사람은 1명), 시간은 합계(분)','t2a')}
     <div class="tw" style="margin-top:10px"><table id="t2a" class="h2r"><thead>
@@ -532,14 +531,14 @@ function p2(main){
       <tr>${STAGES.map(()=>`<th>인원(명)</th><th>시간(분)</th>`).join('')}</tr></thead>
       <tbody>${A.map(a=>`<tr data-ed="${esc(a.ed)}" title="누르면 개인별 상세"><th>${a.ed===S.ed?`<span class="chg">${esc(dn(a.ed))}</span>`:esc(dn(a.ed))}</th>${STAGES.map(([k])=>`<td class="num">${z(a.st[k].n)}</td><td class="num">${z(a.st[k].min)}</td>`).join('')}<td class="num">${z(a.rn)}</td><td class="num tot">${fmt(a.tot)}</td></tr>`).join('')}</tbody>
       <tfoot><tr class="sum"><th>합계 (실인원 중복 제외)</th>${STAGES.map(([k])=>`<td class="num">${fmt(uniq(k))}</td><td class="num">${fmt(uniqMin(k))}</td>`).join('')}<td class="num">${fmt(rnSum)}</td><td class="num tot">${fmt(sum)}</td></tr></tfoot></table></div></section>
-  <section class="card">${tools('교육간호사별 월별 교육시간','단위 분 · 기준 '+fmt(STD_MIN)+'분 미만인 달은 흐리게 · 행을 누르면 개인별 상세','t2')}
-    <div class="tw" style="margin-top:10px"><table id="t2"><thead><tr><th>교육간호사</th>${ms.map(m=>`<th>${ml(m)}</th>`).join('')}<th class="tot">합계</th><th>월평균</th><th>기준 달성</th></tr></thead>
-    <tbody>${A.map(a=>{ const per=ms.map(m=>edAgg(a.ed,[m])); const ok=per.filter(x=>x.reports&&x.tot>=STD_MIN).length;
-      return `<tr data-ed="${esc(a.ed)}" title="누르면 개인별 상세"><th>${a.ed===S.ed?`<span class="chg">${esc(dn(a.ed))}</span>`:esc(dn(a.ed))}</th>${per.map(x=>`<td class="num"${x.reports&&x.tot<STD_MIN?' style="color:var(--muted)"':''}>${x.reports?fmt(x.tot):'–'}</td>`).join('')}<td class="num tot">${fmt(a.tot)}</td><td class="num">${fmt(a.avgMin)}</td><td class="num">${ok}/${a.reports}개월</td></tr>`; }).join('')}</tbody>
-    <tfoot><tr class="sum"><th>합계</th>${ms.map(m=>`<td class="num">${fmt(A.reduce((s,a)=>s+edAgg(a.ed,[m]).tot,0))}</td>`).join('')}<td class="num tot">${fmt(sum)}</td><td class="num">${fmt(reps?sum/reps:0)}</td><td></td></tr></tfoot></table></div></section>
+  <section class="card">${tools('교육간호사별 월별 교육시간','단위 분 · 행을 누르면 개인별 상세','t2')}
+    <div class="tw" style="margin-top:10px"><table id="t2"><thead><tr><th>교육간호사</th>${ms.map(m=>`<th>${ml(m)}</th>`).join('')}<th class="tot">합계</th><th>월평균</th></tr></thead>
+    <tbody>${A.map(a=>{ const per=ms.map(m=>edAgg(a.ed,[m]));
+      return `<tr data-ed="${esc(a.ed)}" title="누르면 개인별 상세"><th>${a.ed===S.ed?`<span class="chg">${esc(dn(a.ed))}</span>`:esc(dn(a.ed))}</th>${per.map(x=>`<td class="num">${x.reports?fmt(x.tot):'–'}</td>`).join('')}<td class="num tot">${fmt(a.tot)}</td><td class="num">${fmt(a.avgMin)}</td></tr>`; }).join('')}</tbody>
+    <tfoot><tr class="sum"><th>합계</th>${ms.map(m=>`<td class="num">${fmt(A.reduce((s,a)=>s+edAgg(a.ed,[m]).tot,0))}</td>`).join('')}<td class="num tot">${fmt(sum)}</td><td class="num">${fmt(reps?sum/reps:0)}</td></tr></tfoot></table></div></section>
   <section class="card" id="edd"></section>`);
   combo(document.getElementById('g2c'), A.map(a=>dn(a.ed)), A.map(a=>a.avgMin), A.map(a=>a.avgPpl), {
-    keys:A.map(a=>a.ed), sel:S.ed, ref:STD_MIN, click:k=>{S.ed=k;render();document.getElementById('edd').scrollIntoView({behavior:'smooth'});},
+    keys:A.map(a=>a.ed), sel:S.ed, click:k=>{S.ed=k;render();document.getElementById('edd').scrollIntoView({behavior:'smooth'});},
     tips:A.map(a=>`${dn(a.ed)} · 교육시간 ${fmt(a.avgMin)}분${one?'':' (월평균, 합계 '+fmt(a.tot)+'분)'}`),
     cntTxt:v=>(one?fmt(v):v.toLocaleString('ko-KR',{maximumFractionDigits:1}))+'명', aria:'교육간호사별 교육시간과 교육대상자'});
   document.querySelectorAll('#t2 tr[data-ed], #t2a tr[data-ed]').forEach(tr=>tr.onclick=()=>{S.ed=tr.dataset.ed;render();document.getElementById('edd').scrollIntoView({behavior:'smooth'});});
@@ -551,41 +550,38 @@ function p2(main){
   if(!ed){ box.innerHTML=`<div class="hd-row"><div><h2>개인별 상세</h2><p class="hint">그래프 막대나 표의 이름을 누르거나, 오른쪽에서 교육간호사를 고르면 개인별 검토 화면이 열려요.</p></div>${pick}</div>`;
     document.getElementById('edpick').onchange=e=>{S.ed=e.target.value||null;render();}; return; }
   const a=A.find(x=>x.ed===ed), dp=deptsOf(ed,ms);
-  const per=ms.map(m=>edAgg(ed,[m])), repMs=per.filter(x=>x.reports), okN=repMs.filter(x=>x.tot>=STD_MIN).length;
+  const per=ms.map(m=>edAgg(ed,[m])), repMs=per.filter(x=>x.reports);
   const teamAvg=reps?sum/reps:0, diff=teamAvg?(a.avgMin/teamAvg-1)*100:0;
   const biz=D.biz.filter(b=>b[3]===ed&&b[0]===bizM);
   const bizTxt=biz.length?biz.map(b=>`${BIZ_SHORT[b[1]]||b[1]} ${b[6]}${b[7]&&b[7]!=='유지'?' ('+b[7]+')':''}`).join(', '):'신고 없음';
   const hyShare=a.tot?a.hy/a.tot*100:0;
   /* 대상자 목록 */
   const map={}; recsOf(ed,ms).forEach(x=>{ const k=pk2(x); const o=(map[k]=map[k]||{name:x[2],rid:x[5],type:x[3],min:0,mm:new Set(),last:x}); o.min+=x[4]; o.mm.add(x[0]); if(x[0]>=o.last[0]) o.last=x; });
-  const list=Object.values(map).sort((p,q)=>q.min-p.min);
-  /* 담당부서 신규간호사(발령 1~12개월) 교육 확인 */
-  const dset=new Set(dp?dp.list:[]);
-  const newbies=roster.map((r,i)=>({r,i})).filter(({r,i})=>dset.has(deptName(r.dept)) && (!r.resign||r.resign.slice(0,7)>=ms[0]) && ms.some(m=>{const k=kOf(i,m);return k>=1&&k<=12;}))
-    .map(({r,i})=>{ const mine=R.recs.filter(x=>x[5]===i&&x[1]===ed&&ms.includes(x[0])).reduce((s,x)=>s+x[4],0); const other=R.recs.filter(x=>x[5]===i&&x[1]!==ed&&ms.includes(x[0])).reduce((s,x)=>s+x[4],0);
-      const k=kOf(i,lastM); return {r,i,k,mine,other}; })
-    .sort((p,q)=>(p.mine>0)-(q.mine>0) || unitRank(deptName(p.r.dept))-unitRank(deptName(q.r.dept)) || q.k-p.k);
-  const miss=newbies.filter(n=>!n.mine&&!n.other&&ms.some(m=>{const k=kOf(n.i,m);return k>=1&&k<=6;}));
+  const SORTS={min:['교육시간 많은 순',(p,q)=>q.min-p.min],stage:['구분 · 개월차 순',(p,q)=>STAGES.findIndex(s=>s[0]===stage(p.last))-STAGES.findIndex(s=>s[0]===stage(q.last)) || (p.rid!=null&&q.rid!=null?kOf(p.rid,p.last[0])-kOf(q.rid,q.last[0]):0) || q.min-p.min],
+    dept:['부서 순',(p,q)=>unitRank(p.rid!=null?deptName(roster[p.rid].dept):'명단 외')-unitRank(q.rid!=null?deptName(roster[q.rid].dept):'명단 외') || p.name.localeCompare(q.name,'ko')],name:['이름 순',(p,q)=>p.name.localeCompare(q.name,'ko')]};
+  if(!SORTS[S.t3sort]) S.t3sort='min';
+  const list=Object.values(map).sort(SORTS[S.t3sort][1]);
   const stTxt=STAGES.map(([k,nm])=>a.st[k].n?`${nm} ${a.st[k].n}`:'').filter(Boolean).join(' · ');
   box.innerHTML=`<div class="hd-row"><div><h2>${esc(dn(ed))} 개인별 상세</h2><p class="hint">${dp?esc(dp.place)+' · 담당부서 '+esc(dp.list.join(', '))+' ('+ml(dp.m)+' 결재문서)':'담당부서 정보 없음'} · 사업신고 ${esc(bizTxt)} (${ml(bizM)})</p></div>
     <div style="display:flex;gap:8px;align-items:center">${pick}<button class="btn" id="edclose">닫기</button></div></div>
     <div class="kpis" style="margin-top:10px">
       <div class="kpi"><div class="lab">총 교육시간</div><div class="val num">${fmt(a.tot)}<small>분</small></div><div class="sub">현장교육 ${fmt(a.hy)} · 부서라운딩 ${fmt(a.rn)} (현장 ${hyShare.toFixed(0)}%)</div></div>
-      <div class="kpi"><div class="lab">기준 달성</div><div class="val num">${okN}<small>/ ${repMs.length}개월</small></div><div class="sub">월 ${fmt(STD_MIN)}분 이상인 달 · 월평균 ${fmt(a.avgMin)}분</div></div>
+      <div class="kpi"><div class="lab">월평균 교육시간</div><div class="val num">${fmt(a.avgMin)}<small>분</small></div><div class="sub">보고서 ${repMs.length}개월 기준</div></div>
       <div class="kpi"><div class="lab">팀 평균 대비</div><div class="val num">${diff>=0?'+':''}${diff.toFixed(0)}<small>%</small></div><div class="sub">팀 월평균 ${fmt(teamAvg)}분 기준</div></div>
       <div class="kpi"><div class="lab">교육대상자</div><div class="val num">${a.ppl}<small>명</small></div><div class="sub">${esc(stTxt||'–')}</div></div>
     </div>
-    ${miss.length?`<div class="callout" style="margin-top:12px">담당부서 신규간호사 Ⅰ(조회 기간 중 발령 1~6개월) 중 <b>${miss.length}명</b>은 조회 기간에 누구에게도 현장교육 기록이 없어요: ${esc(miss.map(n=>n.r.name+'('+deptName(n.r.dept)+', '+n.k+'개월차)').join(', '))}</div>`:''}
     <div class="grid2" style="margin-top:12px">
-      <div><h3 style="margin:0 0 4px;font-size:14px">월별 교육시간</h3><p class="hint" style="margin:0">빨간 선 = 월 기준 ${fmt(STD_MIN)}분</p>${legend([['--c-HY','현장교육'],['--c-RD','부서라운딩']])}<div class="chart-wrap" id="g4"></div></div>
-      <div>${tools('담당부서 신규간호사 교육 확인','발령 1~12개월 · 이 교육간호사 기록이 없는 사람이 위로','t4')}<div class="tw tl" style="margin-top:10px;max-height:340px"><table id="t4"><thead><tr><th>이름</th><th>부서</th><th>발령</th><th>개월차(${ml(lastM)})</th><th>본인 교육(분)</th><th>다른 교육간호사(분)</th></tr></thead><tbody>${
-        newbies.length?newbies.map(n=>`<tr><td>${esc(n.r.name)} ${n.r.resign?'<span class="st plan">사직</span>':''}</td><td>${esc(deptName(n.r.dept))}</td><td>${n.r.start.slice(2,7).replace('-','.')}</td><td class="num">${n.k>=1?n.k:'발령 전'}</td><td class="num">${n.mine?fmt(n.mine):'<span class="st warn">기록 없음</span>'}</td><td class="num">${z(n.other)}</td></tr>`).join(''):'<tr><td colspan="6" class="note">해당 인원이 없어요</td></tr>'}</tbody></table></div></div>
+      <div><h3 style="margin:0 0 4px;font-size:14px">월별 교육시간</h3><p class="hint" style="margin:0">단위 분</p>${legend([['--c-HY','현장교육'],['--c-RD','부서라운딩']])}<div class="chart-wrap" id="g4"></div></div>
+      <div><h3 style="margin:0 0 4px;font-size:14px">월별 교육대상자 수</h3><p class="hint" style="margin:0">단위 명 · 그 달에 교육한 실인원</p>${legend(STAGES.map(s=>[s[2],s[1]]))}<div class="chart-wrap" id="g5"></div></div>
     </div>
-    <div style="margin-top:14px">${tools('교육대상자 목록','교육시간 많은 순 · 구분은 마지막 교육월 기준','t3')}<div class="tw tl" style="margin-top:10px;max-height:380px"><table id="t3"><thead><tr><th>교육대상자</th><th>구분</th><th>부서 · 발령</th><th>개월차</th><th>교육월 수</th><th>교육시간(분)</th><th>1회 평균(분/월)</th></tr></thead><tbody>${
+    <div style="margin-top:14px">${tools('교육대상자 목록',SORTS[S.t3sort][0]+' · 구분·개월차는 마지막 교육월 기준','t3')}<div style="margin-top:8px"><select id="t3sort" aria-label="정렬">${Object.entries(SORTS).map(([k,v])=>`<option value="${k}" ${k===S.t3sort?'selected':''}>${v[0]}</option>`).join('')}</select></div><div class="tw tl" style="margin-top:10px;max-height:380px"><table id="t3"><thead><tr><th>교육대상자</th><th>구분</th><th>부서 · 발령</th><th>개월차</th><th>교육월 수</th><th>교육시간(분)</th><th>1회 평균(분/월)</th></tr></thead><tbody>${
       list.map(p=>{const r=p.rid!=null?roster[p.rid]:null; const sg=STAGES.find(s=>s[0]===stage(p.last)); return `<tr><td>${esc(p.name)} ${r&&r.resign?'<span class="st plan">사직</span>':''}</td><td><span class="cdot" style="--cc:var(${sg[2]})"></span>${sg[1]}</td><td>${r?esc(deptName(r.dept))+' · '+r.start.slice(2,7).replace('-','.'):'<span class="note">명단 외</span>'}</td><td class="num">${r?kOf(p.rid,p.last[0])+'개월':'–'}</td><td class="num">${p.mm.size}</td><td class="num"><b>${fmt(p.min)}</b></td><td class="num">${fmt(p.min/p.mm.size)}</td></tr>`;}).join('')}</tbody></table></div></div>`;
   document.getElementById('edpick').onchange=e=>{S.ed=e.target.value||null;render();};
+  document.getElementById('t3sort').onchange=e=>{S.t3sort=e.target.value;render();document.getElementById('t3').scrollIntoView({block:'center'});};
   document.getElementById('edclose').onclick=()=>{S.ed=null; if(S.eds.size===1) S.eds.clear(); render();};
-  vbar(document.getElementById('g4'),ms.map(ml),[{name:'현장교육',c:'--c-HY',values:per.map(x=>x.hy)},{name:'부서라운딩',c:'--c-RD',values:per.map(x=>x.rn)}],{ft:v=>fmt(v)+'분',ref:STD_MIN,aria:ed+' 월별 교육시간'});
+  vbar(document.getElementById('g4'),ms.map(ml),[{name:'현장교육',c:'--c-HY',values:per.map(x=>x.hy)},{name:'부서라운딩',c:'--c-RD',values:per.map(x=>x.rn)}],{ft:v=>fmt(v)+'분',aria:ed+' 월별 교육시간'});
+  const er=recsOf(ed,ms);
+  vbar(document.getElementById('g5'),ms.map(ml),STAGES.map(([k,nm,c])=>({name:nm,c,values:ms.map(m=>new Set(er.filter(x=>x[0]===m&&stage(x)===k).map(pk2)).size)})),{ft:v=>fmt(v)+'명',aria:ed+' 월별 교육대상자 수'});
 }
 
 /* ---------- 3. 현장교육 세부분석 ---------- */
