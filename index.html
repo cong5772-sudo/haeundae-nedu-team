@@ -74,7 +74,7 @@ html,body{height:auto;min-height:100%}
 .pp-pan{position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:260px;max-width:min(360px,calc(100vw - 32px));background:var(--surface);border:1px solid var(--line2);border-radius:12px;box-shadow:0 10px 30px rgba(10,11,13,.18);padding:12px}
 .pp-pan label{display:flex;align-items:flex-start;gap:8px;padding:5px 2px;font-size:13px;line-height:1.35;cursor:pointer}
 .pp-pan .pp-act{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
-.head-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.head-row{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:10px 12px}.head-row>div:first-child{flex:1 1 320px;min-width:0}
 @media print{.pr-hide{display:none!important}#edpick{display:none!important}}
 .okline{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600}
 .okline i{width:8px;height:8px;border-radius:50%;background:var(--good)}
@@ -296,7 +296,10 @@ const selMonths = () => MONTHS.filter(m=>S.months.has(m));
 const R = {recs:[], rounds:[], all:[], unitOn:false};
 const unitOn = () => S.groups.size>0 || S.units.size>0;
 const unitOk = x => !unitOn() || S.units.has(deptOf(x)) || S.groups.has(groupOf(x));
-const edOk = e => !S.eds.size || S.eds.has(e);
+/* 이진호(전담간호사 교육): 신규간호사 교육 분석에서는 예외 — 3페이지는 항상 제외, 1·2페이지는 상단 버튼으로 포함/제외 */
+const LJH='이진호';
+const ljhOff = () => S.page==='p3' || ((S.page==='p1'||S.page==='p2') && S.ljh===false);
+const edOk = e => !(e===LJH && ljhOff()) && (!S.eds.size || S.eds.has(e));
 function applyFilter(){
   R.unitOn = unitOn();
   R.all = D.recs.filter(x=>edOk(x[1]) && unitOk(x));
@@ -524,7 +527,7 @@ function pagePrint(btn){
   pan.querySelector('[data-ppgo]').onclick=()=>{ const sel=boxes.filter(b=>b.checked).map(b=>secs[+b.dataset.pp]); if(!sel.length){ alert('출력할 구역을 하나 이상 골라 주세요.'); return; } pan.remove(); printOnly(sel.length===secs.length?null:sel); };
 }
 document.addEventListener('click',e=>{ const b=e.target.closest('[data-pprint]'); if(b){ pagePrint(b); return; } if(!e.target.closest('.pp-wrap')) document.querySelectorAll('.pp-pan').forEach(x=>x.remove()); });
-const phdr = page => `<div class="phdr">${esc(page.name)} · 조회 조건: ${esc(page.period?document.getElementById('f-sum').textContent:'-')} · 데이터 기준 ${esc(D.updated)} · 출력 ${new Date().toLocaleString('ko-KR')}</div>`;
+const phdr = page => `<div class="phdr">${esc(page.name)} · 조회 조건: ${esc(page.period?document.getElementById('f-sum').textContent:'-')}${page.id==='p1'||page.id==='p2'?(S.ljh===false?' · 이진호 제외':' · 이진호 포함'):page.id==='p3'?' · 이진호(전담간호사 교육) 제외':''} · 데이터 기준 ${esc(D.updated)} · 출력 ${new Date().toLocaleString('ko-KR')}</div>`;
 
 /* ---------- 1. 월별 교육현황 ---------- */
 function p1(main){
@@ -613,8 +616,7 @@ function p1(main){
 /* ---------- 2. 교육간호사별 ---------- */
 const ED_NOTE = {'정미진':'부서이동'};       /* 이름 옆 표기 */
 const EXCLUDED_EDS = [];                    /* 보고서 정리 제외 대상(2026-10-11부터 없음) */
-const ED_TAG = {'이진호':'전담'};           /* 이름 옆 담당 표기 */
-const dn = e => e + (ED_NOTE[e]||ED_TAG[e] ? `(${ED_NOTE[e]||ED_TAG[e]})` : '');
+const dn = e => e + (ED_NOTE[e] ? `(${ED_NOTE[e]})` : '');
 const pk2 = x => x[5]!=null ? 'r'+x[5] : x[2]+'|'+x[3];
 /* 표시 순서: 배치구분 → 그 달 결재문서 순서, 지금 근무 중인 사람이 먼저 */
 const ED_ORDER = (()=>{ const last={}; D.dept.forEach(d=>{ if(!last[d[1]]||d[0]>last[d[1]][0]) last[d[1]]=d; });
@@ -655,7 +657,7 @@ function p2(main){
   const sum=A.reduce((a,x)=>a+x.tot,0), reps=A.reduce((a,x)=>a+x.reports,0), pmSum=A.reduce((a,x)=>a+x.pm,0);
   const bizM=BMS.includes(lastM)?lastM:BMS[BMS.length-1];
   const jeondam=[...new Set(D.biz.filter(b=>b[0]===bizM&&b[2]==='교육전담'&&b[6]!=='제외').map(b=>b[3]))];
-  const fieldN=[...new Set(D.rounds.filter(x=>x[0]===lastM).map(x=>x[1]))].filter(e=>!jeondam.includes(e)).length + EXCLUDED_EDS.length;
+  const fieldN=[...new Set(D.rounds.filter(x=>x[0]===lastM).map(x=>x[1]))].filter(e=>!jeondam.includes(e)&&edOk(e)).length + EXCLUDED_EDS.length;
   const allRecs=R.recs.filter(x=>A.some(a=>a.ed===x[1]));
   const uniq=k=>new Set(allRecs.filter(x=>stage(x)===k).map(pk2)).size, uniqMin=k=>allRecs.filter(x=>stage(x)===k).reduce((s,x)=>s+x[4],0);
   const rnSum=A.reduce((a,x)=>a+x.rn,0);
@@ -1252,8 +1254,10 @@ function render(){
   applyFilter();
   syncFilter(page);
   const main=document.getElementById('main');
-  main.innerHTML=phdr(page)+`<div class="head head-row"><div><h1>${esc(page.name)}</h1><p>${esc(page.desc)}</p></div><div class="pp-wrap no-print"><button class="btn" data-pprint title="기본은 페이지 전체 · 구역을 골라 출력할 수도 있어요">🖨 페이지 출력</button></div></div>`+
+  main.innerHTML=phdr(page)+`<div class="head head-row"><div><h1>${esc(page.name)}</h1><p>${esc(page.desc)}</p></div>${page.id==='p1'||page.id==='p2'?`<div class="tg no-print" id="ljh" title="이진호 교육간호사(전담간호사 교육) 자료를 넣거나 빼고 봐요"><button data-v="1" aria-pressed="${S.ljh!==false}">이진호 포함</button><button data-v="0" aria-pressed="${S.ljh===false}">이진호 제외</button></div>`:''}<div class="pp-wrap no-print"><button class="btn" data-pprint title="기본은 페이지 전체 · 구역을 골라 출력할 수도 있어요">🖨 페이지 출력</button></div></div>`+
     (page.period&&R.unitOn?`<div class="callout">간호단위(${esc([...S.groups,...S.units].join(', '))})를 골라 교육대상자 부서로 걸렀어요. 부서라운딩은 부서별로 나뉘지 않아 이 조건에서는 빠지고, 신규명단에 없는 인원('명단 외')도 빠져요.</div>`:'');
+  const lj=document.getElementById('ljh'); if(lj) lj.onclick=e=>{ const b=e.target.closest('[data-v]'); if(!b) return; S.ljh=b.dataset.v==='1'; render(); };
+  if(S.page==='p3') main.insertAdjacentHTML('beforeend','<div class="callout">이 페이지는 신규간호사 현장교육 분석이라, 전담간호사(PAM)를 교육하는 이진호 교육간호사 자료는 빼고 보여요.</div>');
   if(page.period&&!selMonths().length){ main.insertAdjacentHTML('beforeend',`<div class="card"><p class="note">선택한 기간(${esc(CAL.filter(m=>S.months.has(m)).map(ml).join(', '))})에는 아직 보고 자료가 없어요. 자료가 있는 기간은 ${esc(ml(MONTHS[0]))}~${esc(ml(MONTHS[MONTHS.length-1]))}입니다.</p></div>`); }
   else ({p1,p2,p3,p4,p5,p6,p7})[S.page](main);
   document.title=page.name+' · 간호교육팀 운영 대시보드';
