@@ -337,8 +337,10 @@ function vbar(el, labels, series, o){
     if(o.total!==false) g+=`<text class="tot" x="${x+bw/2}" y="${y(tot[i])-6}" text-anchor="middle">${o.ft?o.ft(tot[i]).replace(/[^\d.,]/g,''):fmt(tot[i])}</text>`;
     g+= tilt ? `<text x="${x+bw/2+4}" y="${H-B+16}" text-anchor="end" transform="rotate(-35 ${x+bw/2+4} ${H-B+16})">${esc(lb)}</text>` : `<text x="${x+bw/2}" y="${H-8}" text-anchor="middle">${esc(lb)}</text>`; });
   if(o.ref!=null){ const yr=y(o.ref); g+=`<line x1="${L}" x2="${W-R+4}" y1="${yr}" y2="${yr}" style="stroke:var(--crit);stroke-width:1.5"/><text x="${W-R+8}" y="${yr-2}" style="fill:var(--crit-ink)">기준</text><text x="${W-R+8}" y="${yr+11}" style="fill:var(--crit-ink)">${fmt(o.ref)}</text>`; }
+  if(o.click) g+=labels.map((lb,i)=>`<rect class="hit" x="${L+step*i}" y="${T}" width="${step}" height="${H-T-B}" fill="transparent" style="cursor:pointer" data-i="${i}"/>`).join('');
   if(o.avg!=null){ const ya=y(o.avg); g+=`<line class="avg" x1="${L}" x2="${W-R+4}" y1="${ya}" y2="${ya}"/><text x="${W-R+8}" y="${ya-2}" style="fill:var(--muted)">평균</text><text x="${W-R+8}" y="${ya+11}" style="fill:var(--muted)">${o.ft?o.ft(o.avg):fmt(o.avg)}</text>`; }
   el.innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(o.aria||'')}">${g}</svg>`;
+  if(o.click) el.querySelectorAll('.hit').forEach(h=>{ const i=+h.dataset.i; const tp=(o.clickTip||[])[i]; if(tp) h.dataset.tip=tp; h.addEventListener('click',()=>o.click(i)); });
 }
 function hbar(el, labels, series, o){
   charts.push(()=>hbar(el,labels,series,o));
@@ -599,26 +601,44 @@ function p2(main){
   if(!SORTS[S.t3sort]) S.t3sort='min';
   const list=Object.values(map).sort(SORTS[S.t3sort][1]);
   const stTxt=STAGES.map(([k,nm])=>a.st[k].n?`${nm} ${a.st[k].n}`:'').filter(Boolean).join(' · ');
+  /* 월별 교육대상자 목록 */
+  const allEdRecs=R.all.filter(x=>x[1]===ed);   // 기간과 관계없이(누적 개월 계산용)
+  const mlist=ms.map(m=>({m,n:new Set(recsOf(ed,[m]).map(pk2)).size})).filter(x=>x.n||edAgg(ed,[x.m]).reports);
+  if(!S.edMonth||S.edMonthEd!==ed||!mlist.some(x=>x.m===S.edMonth)){ S.edMonth=(mlist.filter(x=>x.n).slice(-1)[0]||mlist.slice(-1)[0]||{m:lastM}).m; S.edMonthEd=ed; }
+  const em=S.edMonth;
+  const teamM=m=>{ const eds=A.filter(x=>edAgg(x.ed,[m]).reports); return eds.length?eds.reduce((s,x)=>s+new Set(recsOf(x.ed,[m]).map(pk2)).size,0)/eds.length:0; };
+  const mm={}; recsOf(ed,[em]).forEach(x=>{ const k=pk2(x); const o=(mm[k]=mm[k]||{name:x[2],rid:x[5],stg:stage(x),min:0,k}); o.min+=x[4]; });
+  const prevM=MONTHS[MONTHS.indexOf(em)-1];
+  const mrows=Object.values(mm).map(o=>{ const months=new Set(allEdRecs.filter(x=>pk2(x)===o.k&&x[0]<=em).map(x=>x[0])); o.cum=months.size; o.isNew=!prevM||!allEdRecs.some(x=>pk2(x)===o.k&&x[0]===prevM); return o; })
+    .sort((p,q)=>STAGES.findIndex(s=>s[0]===p.stg)-STAGES.findIndex(s=>s[0]===q.stg) || (p.rid!=null&&q.rid!=null?kOf(p.rid,em)-kOf(q.rid,em):0) || q.min-p.min);
   box.innerHTML=`<div class="hd-row"><div><h2>${esc(dn(ed))} 개인별 상세</h2><p class="hint">${dp?esc(dp.place)+' · 담당부서 '+esc(dp.list.join(', '))+' ('+ml(dp.m)+' 결재문서)':'담당부서 정보 없음'} · 사업신고 ${esc(bizTxt)} (${ml(bizM)})</p></div>
     <div style="display:flex;gap:8px;align-items:center">${pick}<button class="btn" id="edclose">닫기</button></div></div>
     <div class="kpis" style="margin-top:10px">
       <div class="kpi"><div class="lab">총 교육시간</div><div class="val num">${fmt(a.tot)}<small>분</small></div><div class="sub">현장교육 ${fmt(a.hy)} · 부서라운딩 ${fmt(a.rn)} (현장 ${hyShare.toFixed(0)}%)</div></div>
       <div class="kpi"><div class="lab">월평균 교육시간</div><div class="val num">${fmt(a.avgMin)}<small>분</small></div><div class="sub">보고서 ${repMs.length}개월 기준</div></div>
       <div class="kpi"><div class="lab">팀 평균 대비</div><div class="val num">${diff>=0?'+':''}${diff.toFixed(0)}<small>%</small></div><div class="sub">팀 월평균 ${fmt(teamAvg)}분 기준</div></div>
-      <div class="kpi"><div class="lab">교육대상자</div><div class="val num">${a.ppl}<small>명</small></div><div class="sub">${esc(stTxt||'–')}</div></div>
+      <div class="kpi" id="kpi-ppl" style="cursor:pointer" title="누르면 월별 교육대상자 목록으로"><div class="lab">교육대상자 <span class="note" style="font-weight:500">▸ 월별 목록</span></div><div class="val num">${a.ppl}<small>명</small></div><div class="sub">${esc(stTxt||'–')}</div></div>
     </div>
     <div class="grid2" style="margin-top:12px">
       <div><h3 style="margin:0 0 4px;font-size:14px">월별 교육시간</h3><p class="hint" style="margin:0">단위 분</p>${legend([['--c-HY','현장교육'],['--c-RD','부서라운딩']])}<div class="chart-wrap" id="g4"></div></div>
-      <div><h3 style="margin:0 0 4px;font-size:14px">월별 교육대상자 수</h3><p class="hint" style="margin:0">단위 명 · 그 달에 교육한 실인원</p>${legend(STAGES.map(s=>[s[2],s[1]]))}<div class="chart-wrap" id="g5"></div></div>
+      <div><h3 style="margin:0 0 4px;font-size:14px">월별 교육대상자 수</h3><p class="hint" style="margin:0">단위 명 · 그 달에 교육한 실인원 · 막대를 누르면 그 달 목록</p>${legend(STAGES.map(s=>[s[2],s[1]]))}<div class="chart-wrap" id="g5"></div></div>
     </div>
-    <div style="margin-top:14px">${tools('교육대상자 목록',SORTS[S.t3sort][0]+' · 구분·개월차는 마지막 교육월 기준','t3')}<div style="margin-top:8px"><select id="t3sort" aria-label="정렬">${Object.entries(SORTS).map(([k,v])=>`<option value="${k}" ${k===S.t3sort?'selected':''}>${v[0]}</option>`).join('')}</select></div><div class="tw tl" style="margin-top:10px;max-height:380px"><table id="t3"><thead><tr><th>교육대상자</th><th>구분</th><th>부서</th><th>발령일자</th><th>개월차</th><th>교육월 수</th><th>교육시간(분)</th><th>1회 평균(분/월)</th></tr></thead><tbody>${
+    <div style="margin-top:16px" id="edm">${tools('월별 교육대상자 목록','기준월을 고르면 그 달 이 교육간호사가 누구를 교육했는지 보여요 · 팀 평균은 같은 달 교육간호사 1인당 교육대상자 수','t3m')}
+      <div class="cg" style="margin-top:10px" id="edm-chips">${mlist.map(x=>`<button class="chip" data-em="${x.m}" aria-pressed="${x.m===em}">${ml(x.m)} <b style="margin-left:4px">${x.n}명</b></button>`).join('')}</div>
+      <p class="hint" style="margin:8px 0 0">${ml(em)} 교육대상자 <b style="color:var(--ink)">${mrows.length}명</b> · 같은 달 팀 평균 ${teamM(em).toLocaleString('ko-KR',{maximumFractionDigits:1})}명 · 이번 달 새로 시작 ${mrows.filter(r=>r.isNew).length}명</p>
+      <div class="tw tl" style="margin-top:8px;max-height:380px"><table id="t3m"><thead><tr><th>교육대상자</th><th>구분</th><th>부서</th><th>발령일자</th><th>개월차</th><th>${ml(em)} 교육시간(분)</th><th>이 교육간호사 교육 개월</th><th>비고</th></tr></thead><tbody>${
+        mrows.length?mrows.map(p=>{const r=p.rid!=null?roster[p.rid]:null; const sg=STAGES.find(s=>s[0]===p.stg); return `<tr><td>${esc(p.name)} ${r&&r.resign?`<span class="st rsg" title="사직일 ${esc(r.resign)}">사직</span>`:''}</td><td><span class="cdot" style="--cc:var(${sg[2]})"></span>${sg[1]}</td><td>${r?esc(deptName(r.dept)):'<span class="note">명단 외</span>'}</td><td class="num">${r?esc(r.start.slice(0,10)):'–'}</td><td class="num">${r?kOf(p.rid,em)+'개월':'–'}</td><td class="num"><b>${fmt(p.min)}</b></td><td class="num">${p.cum}개월째</td><td>${p.isNew?'<span class="st add">새로 시작</span>':'계속'}</td></tr>`;}).join(''):'<tr><td colspan="8" class="note">이 달에는 교육 기록이 없어요</td></tr>'}</tbody></table></div></div>
+    <div style="margin-top:16px">${tools('교육대상자별 교육시간',SORTS[S.t3sort][0]+' · 조회 기간 합계 · 구분·개월차는 마지막 교육월 기준','t3')}<div style="margin-top:8px"><select id="t3sort" aria-label="정렬">${Object.entries(SORTS).map(([k,v])=>`<option value="${k}" ${k===S.t3sort?'selected':''}>${v[0]}</option>`).join('')}</select></div><div class="tw tl" style="margin-top:10px;max-height:380px"><table id="t3"><thead><tr><th>교육대상자</th><th>구분</th><th>부서</th><th>발령일자</th><th>개월차</th><th>교육월 수</th><th>교육시간(분)</th><th>1회 평균(분/월)</th></tr></thead><tbody>${
       list.map(p=>{const r=p.rid!=null?roster[p.rid]:null; const sg=STAGES.find(s=>s[0]===stage(p.last)); return `<tr><td>${esc(p.name)} ${r&&r.resign?`<span class="st rsg" title="사직일 ${esc(r.resign)}">사직</span>`:''}</td><td><span class="cdot" style="--cc:var(${sg[2]})"></span>${sg[1]}</td><td>${r?esc(deptName(r.dept)):'<span class="note">명단 외</span>'}</td><td class="num">${r?esc(r.start.slice(0,10)):'–'}</td><td class="num">${r?kOf(p.rid,p.last[0])+'개월':'–'}</td><td class="num">${p.mm.size}</td><td class="num"><b>${fmt(p.min)}</b></td><td class="num">${fmt(p.min/p.mm.size)}</td></tr>`;}).join('')}</tbody></table></div></div>`;
   document.getElementById('edpick').onchange=e=>{S.ed=e.target.value||null;render();};
   document.getElementById('t3sort').onchange=e=>{S.t3sort=e.target.value;render();document.getElementById('t3').scrollIntoView({block:'center'});};
+  const goEdm=m=>{ S.edMonth=m; S.edMonthEd=ed; render(); document.getElementById('edm').scrollIntoView({behavior:'smooth',block:'start'}); };
+  document.querySelectorAll('#edm-chips [data-em]').forEach(b=>b.onclick=()=>goEdm(b.dataset.em));
+  document.getElementById('kpi-ppl').onclick=()=>document.getElementById('edm').scrollIntoView({behavior:'smooth',block:'start'});
   document.getElementById('edclose').onclick=()=>{S.ed=null; if(S.eds.size===1) S.eds.clear(); render();};
   vbar(document.getElementById('g4'),ms.map(ml),[{name:'현장교육',c:'--c-HY',values:per.map(x=>x.hy)},{name:'부서라운딩',c:'--c-RD',values:per.map(x=>x.rn)}],{ft:v=>fmt(v)+'분',aria:ed+' 월별 교육시간'});
   const er=recsOf(ed,ms);
-  vbar(document.getElementById('g5'),ms.map(ml),STAGES.map(([k,nm,c])=>({name:nm,c,values:ms.map(m=>new Set(er.filter(x=>x[0]===m&&stage(x)===k).map(pk2)).size)})),{ft:v=>fmt(v)+'명',aria:ed+' 월별 교육대상자 수'});
+  vbar(document.getElementById('g5'),ms.map(ml),STAGES.map(([k,nm,c])=>({name:nm,c,values:ms.map(m=>new Set(er.filter(x=>x[0]===m&&stage(x)===k).map(pk2)).size)})),{ft:v=>fmt(v)+'명',aria:ed+' 월별 교육대상자 수',click:i=>goEdm(ms[i]),clickTip:ms.map(m=>`${ml(m)} 교육대상자 ${new Set(er.filter(x=>x[0]===m).map(pk2)).size}명 · 누르면 목록 보기`)});
 }
 
 /* ---------- 3. 현장교육 세부분석 ---------- */
