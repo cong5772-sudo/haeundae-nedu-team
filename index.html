@@ -769,34 +769,58 @@ function p4(main){
   const norm=s=>s.split(',').map(x=>x.trim()).sort().join(',');
   if(!S.deptMonth||!DMS.includes(S.deptMonth)) S.deptMonth=DMS[DMS.length-1];
   const lm=S.deptMonth, end=lm+'-31';
+  const nx=(()=>{ const d=new Date(+lm.slice(0,4), +lm.slice(5), 1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); })();
   const rows=D.dept.filter(d=>d[0]===lm).sort((a,b)=>ED_ORDER.indexOf(a[1])-ED_ORDER.indexOf(b[1]));
   const alias={OR:['OR','수술실'],ER:['ER','응급실'],RCR:['RCR','회복실']}, uds=u=>alias[u]||[u];
   const units=u=>String(u).split(',').map(x=>x.trim()).filter(Boolean);
-  const newIn=us=>roster.filter(r=>us.some(u=>uds(u).includes(r.dept))&&r.start<=end&&kOf(r.id,lm)>=1&&kOf(r.id,lm)<=12&&(!r.resign||r.resign>end)).length;
+  const inUnits=(us,dept)=>us.some(u=>uds(u).includes(dept));
+  /* 담당부서 신규간호사 Ⅰ(발령 1~6개월, 재직) 인원: 이번 달 / 다음 달 */
+  const n1Pool=(us,m)=>roster.filter(r=>inUnits(us,r.dept)&&kOf(r.id,m)>=1&&kOf(r.id,m)<=6&&(!r.resign||r.resign.slice(0,7)>=m)).length;
+  const pk3=x=>x[5]!=null?'r'+x[5]:x[2]+'|'+x[3];
+  /* 교육간호사별 그 달 교육대상자 구성 */
+  const load=ed=>{ const r=D.recs.filter(x=>x[0]===lm&&x[1]===ed), ppl={}, st={N1:new Set(),N2:new Set(),RN:new Set(),MV:new Set()}, byDept={};
+    r.forEach(x=>{ const k=pk3(x); st[stage(x)].add(k); ppl[k]=1; const d=x[5]!=null?deptName(roster[x[5]].dept):'명단 외'; (byDept[d]=byDept[d]||new Set()).add(k); });
+    return {n:Object.keys(ppl).length, st:Object.fromEntries(Object.entries(st).map(([k,v])=>[k,v.size])), min:r.reduce((a,x)=>a+x[4],0), byDept:Object.fromEntries(Object.entries(byDept).map(([k,v])=>[k,v.size]))}; };
+  const L=rows.map(r=>{ const us=units(r[3]); return {ed:r[1], place:placeName(r[2]), us, ...load(r[1]), p1:n1Pool(us,lm), p2:n1Pool(us,nx)}; });
+  const act=L.filter(x=>x.n>0), avg=act.length?act.reduce((a,x)=>a+x.n,0)/act.length:0;
+  const lvl=x=>!avg||!x.n?['','–']:x.n>=avg*1.3?['hi','많음']:x.n<=avg*0.7?['lo','적음']:['','보통'];
+  const hiN=L.filter(x=>lvl(x)[0]==='hi').length;
   const changes=[];
   DMS.forEach((m,i)=>{ if(!i) return; const pm=DMS[i-1]; eds.forEach(e=>{const v=get(e,m),p=get(e,pm);
     if(v&&p&&norm(v)!==norm(p)){const a=units(v),b=units(p);changes.push([m,e,a.filter(x=>!b.includes(x)),b.filter(x=>!a.includes(x)),'']);}
     else if(v&&!p) changes.push([m,e,units(v),[],'담당 시작']);
     else if(!v&&p) changes.push([m,e,[],units(p),'담당 종료']); }); });
-  const allUnits=new Set(rows.flatMap(r=>units(r[3])));
   const prev=DMS[DMS.indexOf(lm)-1];
+  const cntM=(e,m)=>new Set(D.recs.filter(x=>x[0]===m&&x[1]===e).map(pk3)).size;
   main.insertAdjacentHTML('beforeend',`
   <div class="card tools" style="padding:14px 20px"><div class="seg"><span class="gl">기준월</span>${DMS.map(mm=>`<button class="chip" data-dm="${mm}" aria-pressed="${mm===lm}">${ml(mm)}</button>`).join('')}</div></div>
   <div class="kpis">
-    <div class="kpi"><div class="lab">현장교육간호사</div><div class="val num">${rows.length}<small>명</small></div><div class="sub">${ml(lm)} 결재문서 기준</div></div>
-    <div class="kpi"><div class="lab">담당 부서</div><div class="val num">${allUnits.size}<small>개</small></div><div class="sub">교육간호사가 배정된 부서</div></div>
-    <div class="kpi"><div class="lab">1년 이내 재직 신규간호사</div><div class="val num">${newIn([...allUnits])}<small>명</small></div><div class="sub">담당 부서 합계 · ${ml(lm)} 말 기준</div></div>
-    <div class="kpi"><div class="lab">담당부서 변경</div><div class="val num">${changes.filter(c=>c[0]===lm).length}<small>건</small></div><div class="sub">${prev?ml(prev)+' 대비':'첫 달'}</div></div>
+    <div class="kpi"><div class="lab">현장교육간호사</div><div class="val num">${rows.length}<small>명</small></div><div class="sub">${ml(lm)} 결재문서 기준 · 담당 부서 ${new Set(rows.flatMap(r=>units(r[3]))).size}개</div></div>
+    <div class="kpi"><div class="lab">${ml(lm)} 교육대상자</div><div class="val num">${act.reduce((a,x)=>a+x.n,0)}<small>명</small></div><div class="sub">교육간호사별 인원 합계(중복 포함)</div></div>
+    <div class="kpi"><div class="lab">1인 평균 교육대상자</div><div class="val num">${avg.toLocaleString('ko-KR',{maximumFractionDigits:1})}<small>명</small></div><div class="sub">평균의 1.3배 이상 = 많음</div></div>
+    <div class="kpi"><div class="lab">인원 많은 교육간호사</div><div class="val num">${hiN}<small>명</small></div><div class="sub">${esc(L.filter(x=>lvl(x)[0]==='hi').map(x=>dn(x.ed)).join(', ')||'없음')}</div></div>
   </div>
-  <section class="card">${tools(`${ml(lm)} 현장교육간호사별 담당부서`,'배치구분 순 · <span class="chg">파란 배지</span>는 직전 달보다 새로 맡은 부서','t5m')}
-    <div class="tw" style="margin-top:10px"><table id="t5m"><thead><tr><th style="width:150px">교육간호사</th><th style="width:130px;text-align:left">배치구분</th><th style="text-align:left">담당부서</th><th style="width:110px">부서 수</th><th style="width:150px">1년 이내 재직 신규(명)</th></tr></thead><tbody>${
-      rows.map(r=>{ const us=units(r[3]), pu=prev?units(get(r[1],prev)):[]; return `<tr><th>${esc(dn(r[1]))}</th><td style="text-align:left">${esc(placeName(r[2]))}</td><td style="text-align:left">${us.map(u=>`<span class="st${prev&&!pu.includes(u)?' add':''}" style="margin:2px 4px 2px 0">${esc(deptName(u))}</span>`).join('')}</td><td class="num">${us.length}</td><td class="num">${z(newIn(us))}</td></tr>`; }).join('')}</tbody></table></div></section>
-  <section class="card">${tools('교육간호사 × 월 담당부서','<span class="chg">파란 글씨</span>는 직전 달과 담당부서가 달라진 달','t5')}
+  <section class="card"><h2>${ml(lm)} 교육간호사별 교육대상자 구성</h2><p class="hint">막대 = 그 달 교육한 실인원(구분별), 점선 = 1인 평균. 평균보다 크게 많은 교육간호사는 담당부서 조정을 검토하세요.</p>
+    ${legend(STAGES.map(s=>[s[2],s[1]]),'1인 평균')}<div class="chart-wrap" id="g7"></div></section>
+  <section class="card">${tools(`${ml(lm)} 현장교육간호사별 담당부서 · 교육대상자`,'담당부서 배지 옆 숫자 = 그 부서 출신 교육대상자 수 · <span class="chg">파란 배지</span> = 직전 달보다 새로 맡은 부서 · 담당부서 신규Ⅰ = 발령 1~6개월 재직 신규간호사(다음 달 예상 포함)','t5m')}
+    <div class="tw" style="margin-top:10px"><table id="t5m" class="h2r"><thead>
+      <tr><th rowspan="2" style="min-width:110px">교육간호사</th><th rowspan="2" style="text-align:left;min-width:90px">배치구분</th><th rowspan="2" style="text-align:left;min-width:230px">담당부서 (교육대상자 수)</th><th rowspan="2">부서 수</th><th rowspan="2" class="tot">교육대상자(명)</th><th colspan="4" style="text-align:center">교육대상자 구성(명)</th><th rowspan="2">교육시간(분)</th><th colspan="2" style="text-align:center">담당부서 신규Ⅰ(명)</th><th rowspan="2">인원 수준</th></tr>
+      <tr>${STAGES.map(s=>`<th><span class="cdot" style="--cc:var(${s[2]})"></span>${s[1].replace('신규간호사 ','신규')}</th>`).join('')}<th>${ml(lm)}</th><th>${ml(nx)} 예상</th></tr></thead><tbody>${
+      L.map(x=>{ const pu=prev?units(get(x.ed,prev)):[]; const lv=lvl(x); const other=Object.entries(x.byDept).filter(([d])=>!x.us.some(u=>uds(u).includes(d)||deptName(u)===d));
+        return `<tr data-ed="${esc(x.ed)}"><th>${esc(dn(x.ed))}</th><td style="text-align:left">${esc(x.place)}</td>
+        <td style="text-align:left;white-space:normal">${x.us.map(u=>{ const c=Object.entries(x.byDept).filter(([d])=>uds(u).includes(d)||deptName(u)===d).reduce((a,[,v])=>a+v,0); return `<span class="st${prev&&!pu.includes(u)?' add':''}" style="margin:2px 4px 2px 0">${esc(deptName(u))} <b>${c}</b></span>`; }).join('')}${other.length?`<span class="note" title="담당부서 밖 교육대상자(부서이동자·명단 외 등)">외 ${other.reduce((a,[,v])=>a+v,0)}</span>`:''}</td>
+        <td class="num">${x.us.length}</td><td class="num tot">${x.n||'–'}</td>${STAGES.map(([k])=>`<td class="num">${z(x.st[k])}</td>`).join('')}
+        <td class="num">${x.min?fmt(x.min):'–'}</td><td class="num">${z(x.p1)}</td><td class="num">${z(x.p2)}</td>
+        <td>${lv[0]==='hi'?'<span class="st rsg">많음</span>':lv[0]==='lo'?'<span class="st plan">적음</span>':`<span class="note">${lv[1]}</span>`}</td></tr>`; }).join('')}</tbody>
+      <tfoot><tr class="sum"><th>합계</th><td></td><td></td><td class="num">${L.reduce((a,x)=>a+x.us.length,0)}</td><td class="num tot">${act.reduce((a,x)=>a+x.n,0)}</td>${STAGES.map(([k])=>`<td class="num">${L.reduce((a,x)=>a+x.st[k],0)}</td>`).join('')}<td class="num">${fmt(L.reduce((a,x)=>a+x.min,0))}</td><td class="num">${L.reduce((a,x)=>a+x.p1,0)}</td><td class="num">${L.reduce((a,x)=>a+x.p2,0)}</td><td></td></tr></tfoot></table></div>
+    <p class="note" style="margin:8px 0 0">교육대상자 = 그 달 업무보고에 기록된 실인원(같은 사람은 1명). 담당부서 신규Ⅰ ${ml(nx)} 예상은 신규명단의 발령일 기준이라, 다음 달 발령자가 많은 교육간호사는 미리 조정이 필요할 수 있어요.</p></section>
+  <section class="card">${tools('교육간호사 × 월 담당부서 · 교육대상자','칸 = 담당부서 / 아래 숫자 = 그 달 교육대상자 수 · <span class="chg">파란 글씨</span>는 직전 달과 담당부서가 달라진 달','t5')}
     <div class="tw" style="margin-top:10px"><table id="t5"><thead><tr><th>교육간호사</th>${DMS.map(m=>`<th style="text-align:center">${ml(m)}</th>`).join('')}</tr></thead><tbody>${
-      eds.map(e=>`<tr><th>${esc(dn(e))}</th>${DMS.map((m,i)=>{const v=get(e,m),p=i?get(e,DMS[i-1]):v;const ch=i&&v&&((p&&norm(v)!==norm(p))||(!p&&DMS.slice(0,i).some(x=>get(e,x))));return `<td style="text-align:center${m===lm?';background:var(--accent-soft)':''}">${v?(ch?`<span class="chg">${esc(v)}</span>`:esc(v)):'–'}</td>`;}).join('')}</tr>`).join('')}</tbody></table></div></section>
-  <section class="card"><h2>담당부서 변경 이력</h2><p class="hint">직전 달 결재문서와 비교</p>${
+      eds.map(e=>`<tr><th>${esc(dn(e))}</th>${DMS.map((m,i)=>{const v=get(e,m),p=i?get(e,DMS[i-1]):v;const ch=i&&v&&((p&&norm(v)!==norm(p))||(!p&&DMS.slice(0,i).some(x=>get(e,x))));const n=cntM(e,m);return `<td style="text-align:center;white-space:normal${m===lm?';background:var(--accent-soft)':''}">${v?(ch?`<span class="chg">${esc(v)}</span>`:esc(v)):'–'}${v?`<div class="note" style="font-weight:600;color:var(--ink2)">${n?n+'명':'–'}</div>`:''}</td>`;}).join('')}</tr>`).join('')}</tbody></table></div></section>
+  <section class="card"><h2>담당부서 변경 이력</h2><p class="hint">직전 달 결재문서와 비교 · 최근 순</p>${
     changes.slice().reverse().map(c=>`<div class="tline"><div class="m">${ml(c[0])}</div><div><b>${esc(dn(c[1]))}</b> ${c[4]?`<span class="note">${c[4]}</span> `:''}${c[2].map(x=>`<span class="st add">+ ${esc(x)}</span>`).join(' ')} ${c[3].map(x=>`<span class="st out">${esc(x)}</span>`).join(' ')}</div></div>`).join('')||'<p class="note">변경 이력이 없어요</p>'}</section>`);
   main.querySelectorAll('[data-dm]').forEach(b=>b.onclick=()=>{ S.deptMonth=b.dataset.dm; render(); });
+  vbar(document.getElementById('g7'), L.map(x=>dn(x.ed)), STAGES.map(([k,nm,c])=>({name:nm,c,values:L.map(x=>x.st[k])})), {ft:v=>fmt(v)+'명', avg, aria:'교육간호사별 교육대상자 구성'});
 }
 
 /* ---------- 5. 사업신고 인력 관리 ---------- */
