@@ -86,6 +86,9 @@
 /* 나란히 놓인 카드: 표를 카드 아래쪽에 맞춰 두 표의 줄이 같은 높이에 오도록 */
 .grid2.eq{align-items:stretch}
 .eqcard{display:flex;flex-direction:column}
+/* 사직 표시: 눈에 띄되 튀지 않는 옅은 로즈 */
+.st.rsg{background:#f8eef0;border-color:#e6c9cf;color:#9a4458;font-weight:600}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .st.rsg{background:#2a1a1f;border-color:#5a3540;color:#e3a3b2}}
 /* 숫자 표: 첫 칸만 정해진 폭, 나머지 칸은 똑같은 폭으로 */
 table.eqcol{table-layout:fixed}
 .tw:not(.tl) table.eqcol thead th{min-width:0}
@@ -609,7 +612,7 @@ function p2(main){
       <div><h3 style="margin:0 0 4px;font-size:14px">월별 교육대상자 수</h3><p class="hint" style="margin:0">단위 명 · 그 달에 교육한 실인원</p>${legend(STAGES.map(s=>[s[2],s[1]]))}<div class="chart-wrap" id="g5"></div></div>
     </div>
     <div style="margin-top:14px">${tools('교육대상자 목록',SORTS[S.t3sort][0]+' · 구분·개월차는 마지막 교육월 기준','t3')}<div style="margin-top:8px"><select id="t3sort" aria-label="정렬">${Object.entries(SORTS).map(([k,v])=>`<option value="${k}" ${k===S.t3sort?'selected':''}>${v[0]}</option>`).join('')}</select></div><div class="tw tl" style="margin-top:10px;max-height:380px"><table id="t3"><thead><tr><th>교육대상자</th><th>구분</th><th>부서</th><th>발령일자</th><th>개월차</th><th>교육월 수</th><th>교육시간(분)</th><th>1회 평균(분/월)</th></tr></thead><tbody>${
-      list.map(p=>{const r=p.rid!=null?roster[p.rid]:null; const sg=STAGES.find(s=>s[0]===stage(p.last)); return `<tr><td>${esc(p.name)} ${r&&r.resign?'<span class="st plan">사직</span>':''}</td><td><span class="cdot" style="--cc:var(${sg[2]})"></span>${sg[1]}</td><td>${r?esc(deptName(r.dept)):'<span class="note">명단 외</span>'}</td><td class="num">${r?esc(r.start.slice(0,10)):'–'}</td><td class="num">${r?kOf(p.rid,p.last[0])+'개월':'–'}</td><td class="num">${p.mm.size}</td><td class="num"><b>${fmt(p.min)}</b></td><td class="num">${fmt(p.min/p.mm.size)}</td></tr>`;}).join('')}</tbody></table></div></div>`;
+      list.map(p=>{const r=p.rid!=null?roster[p.rid]:null; const sg=STAGES.find(s=>s[0]===stage(p.last)); return `<tr><td>${esc(p.name)} ${r&&r.resign?`<span class="st rsg" title="사직일 ${esc(r.resign)}">사직</span>`:''}</td><td><span class="cdot" style="--cc:var(${sg[2]})"></span>${sg[1]}</td><td>${r?esc(deptName(r.dept)):'<span class="note">명단 외</span>'}</td><td class="num">${r?esc(r.start.slice(0,10)):'–'}</td><td class="num">${r?kOf(p.rid,p.last[0])+'개월':'–'}</td><td class="num">${p.mm.size}</td><td class="num"><b>${fmt(p.min)}</b></td><td class="num">${fmt(p.min/p.mm.size)}</td></tr>`;}).join('')}</tbody></table></div></div>`;
   document.getElementById('edpick').onchange=e=>{S.ed=e.target.value||null;render();};
   document.getElementById('t3sort').onchange=e=>{S.t3sort=e.target.value;render();document.getElementById('t3').scrollIntoView({block:'center'});};
   document.getElementById('edclose').onclick=()=>{S.ed=null; if(S.eds.size===1) S.eds.clear(); render();};
@@ -665,7 +668,7 @@ function p3(main){
   nurseRecs.filter(x=>sel.includes(x[5])).forEach(x=>{const k=kOf(x[5],x[0]);cell[x[5]+'|'+k]=(cell[x[5]+'|'+k]||0)+x[4];maxK=Math.max(maxK,k);});
   const ks=[...Array(maxK)].map((_,i)=>i+1), colT=ks.map(k=>sel.reduce((a,i)=>a+(cell[i+'|'+k]||0),0));
   document.getElementById('t4').innerHTML=`<thead><tr><th>성명</th><th style="text-align:left">부서</th>${ks.map(k=>`<th>${k}개월차</th>`).join('')}<th class="tot">합계</th></tr></thead><tbody>`+
-    sel.map(i=>{const r=roster[i];let t=0;return `<tr><th>${esc(r.name)} ${r.resign?`<span class="st plan" title="사직일 ${esc(r.resign)}">사직 ${esc(r.resign.slice(5).replace('-','/'))}</span>`:''}</th><td style="text-align:left">${esc(r.dept)}</td>${ks.map(k=>{const v=cell[i+'|'+k]||0;t+=v;return `<td class="num">${z(v)}</td>`;}).join('')}<td class="num tot">${fmt(t)}</td></tr>`;}).join('')+
+    sel.map(i=>{const r=roster[i];let t=0;return `<tr><th>${esc(r.name)} ${r.resign?`<span class="st rsg" title="사직일 ${esc(r.resign)}">사직 ${esc(r.resign.slice(5).replace('-','/'))}</span>`:''}</th><td style="text-align:left">${esc(r.dept)}</td>${ks.map(k=>{const v=cell[i+'|'+k]||0;t+=v;return `<td class="num">${z(v)}</td>`;}).join('')}<td class="num tot">${fmt(t)}</td></tr>`;}).join('')+
     `</tbody><tfoot><tr class="sum"><th>합계 (${sel.length}명)</th><td></td>${colT.map(v=>`<td class="num">${z(v)}</td>`).join('')}<td class="num tot">${fmt(colT.reduce((a,b)=>a+b,0))}</td></tr></tfoot>`;
 }
 
