@@ -983,7 +983,7 @@ function p5(main){
 }
 
 /* ---------- 7. 간호교육팀 이력 (2차 잠금) ---------- */
-const TH={data:null, err:'', busy:false, at:0, pin:'', edit:null, msg:''};
+const TH={data:null, err:'', busy:false, at:0, pin:'', edit:null, msg:'', tab:'list', month:null, emonth:null};
 function p7(main){
   const can=!!window.opsCall&&opt.team;
   if(TH.data&&!TH.edit&&Date.now()-TH.at>10*60*1000){ TH.data=null; TH.pin=''; }   // 10분 지나면 다시 잠금
@@ -998,6 +998,16 @@ function p7(main){
       TH.busy=false; render(); }; }
     return;
   }
+  const nowM=(()=>{ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); })();
+  if(!TH.month) TH.month=nowM; if(!TH.emonth) TH.emonth=nowM;
+  const snaps=TH.data.snaps||{}, sk=Object.keys(snaps).sort();
+  const mlist=(()=>{ const out=[]; let [y,m]=(sk[0]||'2026-01').split('-').map(Number); const [ey,em]=nowM.split('-').map(Number); while(y<ey||(y===ey&&m<=em)){ out.push(y+'-'+String(m).padStart(2,'0')); m++; if(m>12){m=1;y++;} } return out.reverse(); })();
+  const mlab=mm=>`${mm.slice(0,4)}년 ${+mm.slice(5)}월`;
+  main.insertAdjacentHTML('beforeend',`<div class="card tools" style="padding:12px 20px"><div class="tg" id="thtab">${[['list','기준월 명단·이력'],['edit','이력 변경']].map(([k,n])=>`<button data-tab="${k}" aria-pressed="${TH.tab===k}" ${TH.edit&&k!=='edit'?'disabled':''}>${n}</button>`).join('')}</div>
+    <button class="btn" id="thlock">🔒 다시 잠그기</button></div>`);
+  document.querySelectorAll('#thtab [data-tab]').forEach(b=>b.onclick=()=>{ if(b.disabled) return; TH.tab=b.dataset.tab; TH.msg=''; render(); });
+  document.getElementById('thlock').onclick=()=>{ if(TH.edit&&!confirm('수정 중인 내용을 버리고 잠글까요?')) return; TH.data=null; TH.pin=''; TH.edit=null; TH.msg=''; render(); };
+  if(TH.tab==='list'){ thList(main, snaps, sk, mlist, mlab); return; }
   const H=TH.data.headers, rows=TH.data.rows, today=new Date(), ymd=`${today.getFullYear()}.${String(today.getMonth()+1).padStart(2,'0')}.${String(today.getDate()).padStart(2,'0')}`;
   const fd=v=>String(v).replace(/(^|\n)(\d{4})(\d{2})(\d{2})(?=\n|$)/g,(m,a,y,mo,d)=>`${a}${y}.${mo}.${d}`);
   const exp=H.map((h,i)=>/^경력/.test(h)?i:-1).filter(i=>i>=0), base=H.map((h,i)=>i).filter(i=>!exp.includes(i)), cols=[...base,...exp];
@@ -1013,26 +1023,50 @@ function p7(main){
     <div class="tw" style="margin-top:10px;max-height:none"><table id="th1" class="thist${E?' editing':''}">${head}<tbody>${body}</tbody></table></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:8px;flex-wrap:wrap">
       <p class="note" style="margin:0">${E?'저장하면 구글시트 「간호교육팀 이력」 탭이 바뀌고, 바뀐 칸은 변경 기록에 남아요.':'열람 기록이 남아요. 내려받은 파일은 개인정보이니 송부 후 보관에 주의해 주세요.'}</p>
-      <div style="display:flex;gap:8px">${E?`<button class="btn" id="thadd">＋ 행 추가</button><button class="btn" id="thcancel">취소</button><button class="btn pri" id="thsave" ${TH.busy?'disabled':''}>${TH.busy?'저장 중…':'저장'}</button>`
-        :`<button class="btn" id="thedit">✎ 정보 수정</button><button class="btn" id="thlock">🔒 다시 잠그기</button>`}</div></div></section>`);
+      <div style="display:flex;gap:8px;align-items:center">${E?`<label class="note" style="display:flex;align-items:center;gap:6px;font-weight:600;color:var(--ink2)">적용 기준월 <select id="themonth">${mlist.map(mm=>`<option value="${mm}" ${mm===TH.emonth?'selected':''}>${mlab(mm)}</option>`).join('')}</select></label><button class="btn" id="thadd">＋ 행 추가</button><button class="btn" id="thcancel">취소</button><button class="btn pri" id="thsave" ${TH.busy?'disabled':''}>${TH.busy?'저장 중…':'저장'}</button>`
+        :`<button class="btn pri" id="thedit">✎ 정보 수정</button>`}</div></div></section>`);
   const $=id=>document.getElementById(id);
   const keep=()=>{ document.querySelectorAll('#th1 textarea').forEach(x=>{ E[+x.dataset.r][+x.dataset.c]=x.value; }); };
   if(!E){
-    $('thlock').onclick=()=>{ TH.data=null; TH.pin=''; TH.msg=''; render(); };
     $('thedit').onclick=()=>{ TH.edit=rows.map(r=>H.map((_,i)=>r[i]||'')); TH.msg=''; render(); };
     return;
   }
   document.querySelectorAll('#th1 textarea').forEach(x=>x.oninput=()=>{ x.rows=Math.max(1,x.value.split('\n').length); });
   document.querySelectorAll('#th1 [data-del]').forEach(b=>b.onclick=()=>{ keep(); const r=E[+b.dataset.del]; if(confirm(`${r[1]||'이 행'}을(를) 목록에서 지울까요? (저장해야 반영돼요)`)){ E.splice(+b.dataset.del,1); render(); } });
+  $('themonth').onchange=e=>{ TH.emonth=e.target.value; };
   $('thadd').onclick=()=>{ keep(); E.push(H.map(()=>'')); render(); setTimeout(()=>{ const l=[...document.querySelectorAll('#th1 tbody tr')].pop(); if(l){ l.scrollIntoView({block:'center'}); l.querySelector('textarea').focus(); } },0); };
   $('thcancel').onclick=()=>{ if(!confirm('고친 내용을 버리고 수정을 끝낼까요?')) return; TH.edit=null; render(); };
   $('thsave').onclick=async()=>{ keep(); const rowsN=E.filter(r=>r.join('').trim());
     if(rowsN.some(r=>!String(r[1]||'').trim())){ alert('성명이 빈 행이 있어요.'); return; }
-    if(!confirm(`간호교육팀 이력 ${rowsN.length}명을 저장할까요?`)) return;
+    if(!confirm(`${mlab(TH.emonth)} 기준으로 간호교육팀 이력 ${rowsN.length}명을 저장할까요?\n(변경이 적용된 달을 고르면 그 달부터의 명단·이력에 반영돼요)`)) return;
     TH.busy=true; render();
-    try{ const r=await window.opsCall({action:'teamSave',pin:TH.pin,rows:rowsN}); TH.data={headers:r.headers,rows:r.rows}; TH.edit=null; TH.at=Date.now(); TH.msg=r.log.length?'저장했어요 · '+r.log.join(' / '):'바뀐 내용이 없어요'; }
+    try{ const r=await window.opsCall({action:'teamSave',pin:TH.pin,rows:rowsN,month:TH.emonth}); TH.data={headers:r.headers,rows:r.rows,snaps:r.snaps}; TH.edit=null; TH.at=Date.now(); TH.msg=(r.log.length?'저장했어요 · '+r.log.join(' / '):'바뀐 내용 없이 기준월 기록만 저장했어요')+` (${mlab(TH.emonth)} 기준)`; }
     catch(err){ TH.msg='저장하지 못했어요: '+err.message; }
     TH.busy=false; render(); };
+}
+
+/* 기준월 명단·이력: 그 달에 적용된 이력 기록 + 교육팀 발령일·종료일로 그 달 인원만 */
+function thList(main, snaps, sk, mlist, mlab){
+  const M=TH.month, cur={headers:TH.data.headers, rows:TH.data.rows};
+  const key=sk.filter(k=>k<=M).pop();
+  const src=!key?(sk.length?snaps[sk[0]]:cur):(key===sk[sk.length-1]?cur:snaps[key]);
+  const H=src.headers, iS=H.findIndex(h=>/교육팀\s*발령일/.test(h)), iE=H.findIndex(h=>/종료일/.test(h));
+  const d8=v=>(String(v||'').match(/\d{8}/)||[''])[0];
+  const rows=src.rows.filter(r=>{ const s=d8(r[iS]), e=d8(r[iE]); return (!s||s<=M.replace('-','')+'31')&&(!e||e>=M.replace('-','')+'01'); });
+  const fd=v=>String(v).replace(/(^|\n)(\d{4})(\d{2})(\d{2})(?=\n|$)/g,(m,a,y,mo,d)=>`${a}${y}.${mo}.${d}`);
+  const exp=H.map((h,i)=>/^경력/.test(h)?i:-1).filter(i=>i>=0), base=H.map((h,i)=>i).filter(i=>!exp.includes(i)&&i!==iE);
+  const sub=i=>H[i].replace(/^경력\(?/,'').replace(/\)$/,'')||'경력';
+  const out=src.rows.length-rows.length;
+  main.insertAdjacentHTML('beforeend',`
+  <section class="card">${tools(`간호교육팀 명단·이력 <span class="note" style="font-weight:500">${mlab(M)} 기준 · ${rows.length}명</span>`,'간호관리실(재단) 송부용 · 그 달에 적용된 이력 기록과 교육팀 발령일·종료일로 그 달 인원만 보여줘요','th1')}
+    <div class="seg" style="margin-top:10px"><span class="gl">기준월</span><select id="thm" style="height:34px;border:1px solid var(--line2);border-radius:10px;padding:0 10px;background:var(--surface);color:var(--ink)">${mlist.map(mm=>`<option value="${mm}" ${mm===M?'selected':''}>${mlab(mm)}</option>`).join('')}</select>
+      <span class="note">${key?`이력 기록: ${mlab(key)} 저장분${key===sk[sk.length-1]?'(최신)':''}`:'이력 기록 이전 달 — 가장 오래된 기록 사용'}${out?` · 그 달에 교육팀이 아닌 ${out}명 제외`:''}</span></div>
+    <div class="tw" style="margin-top:10px;max-height:none"><table id="th1" class="thist"><thead>
+      <tr>${base.map(i=>`<th rowspan="${exp.length?2:1}">${esc(H[i]).replace(/\n/g,'<br>')}</th>`).join('')}${exp.length?`<th colspan="${exp.length}" style="text-align:center">경력</th>`:''}</tr>
+      ${exp.length?`<tr>${exp.map(i=>`<th>${esc(sub(i))}</th>`).join('')}</tr>`:''}</thead>
+      <tbody>${rows.map(r=>`<tr>${base.map(i=>`<td>${esc(fd(r[i]))}</td>`).join('')}${exp.map(i=>`<td>${esc(r[i])}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${base.length+exp.length}" class="note">이 달 기준 인원이 없어요</td></tr>`}</tbody></table></div>
+    <p class="note" style="margin:10px 0 0">엑셀·PDF로 받으면 이 달 기준 명단이 그대로 저장돼요. 개인정보이니 송부 후 보관에 주의해 주세요.</p></section>`);
+  document.getElementById('thm').onchange=e=>{ TH.month=e.target.value; render(); };
 }
 
 /* ---------- 6. 업무보고 올리기 ---------- */
