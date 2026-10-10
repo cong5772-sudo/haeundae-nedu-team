@@ -8,18 +8,25 @@
 <!-- 디자인 시스템: 디자인시스템_간호교육대시보드/dashboard.css 그대로. 이 대시보드 구분 색만 아래에서 지정 -->
 <link rel="stylesheet" href="dashboard.css">
 <style>
-/* 이 대시보드의 데이터 구분 색 (기본 팔레트 --c-* 를 역할 이름으로 연결) */
+/* 이 대시보드의 데이터 구분 색 — 차분한 6색 팔레트(색각 이상 검사 통과: 라이트·다크 각각)
+ * v1 블루 · v2 살구 · v3 청록 · v4 라벤더 · v5 머스터드 · v6 로즈 */
 :root{
-  --c-HY:var(--c-REG);   /* 현장교육 */
-  --c-RD:var(--c-SEN);   /* 부서라운딩 */
-  --c-NEW:var(--c-REG);  /* 신규간호사 */
-  --c-MV:var(--c-SEN);   /* 부서이동자 */
-  --c-ETC:var(--c-DED);  /* 기타 간호사 */
-  --k1:#c6dbf7;--k2:#9ec5f4;--k3:#6da7ec;--k4:#3987e5;--k5:#256abf;--k6:#184f95;--k0:#c9ced8; /* 발령 개월차 1→6 (밝음→진함) */
-  --c-P1:var(--c-REG);--c-P2:var(--c-DED);--c-P3:var(--c-PTL);--c-P4:var(--c-SPC);--c-P5:var(--c-MOV);--c-P6:var(--c-SEN); /* 교육간호사 배치구분 */
-  --c-N1:var(--c-REG);--c-N2:var(--c-EMG);--c-RN:var(--c-DED); /* 신규간호사 Ⅰ(1~6개월)·Ⅱ(7~12개월)·간호사 */
-  --c-K1:var(--c-REG);--c-K2:var(--c-SEN);--c-K3:var(--c-DED);--c-K4:var(--c-MOV); /* 발령 차수 비교 */
-  --c-B1:var(--c-DED);--c-B2:var(--c-REG);--c-B3:var(--c-PTL); /* 사업 */
+  --v1:#3f6fb0;--v2:#d98a4e;--v3:#1e9f8f;--v4:#7c69c0;--v5:#c9a227;--v6:#c4607a;--v0:#a3abb9;
+  --k1:#93b0db;--k2:#7699cf;--k3:#5b82c0;--k4:#4570ae;--k5:#345d98;--k6:#274a7c;--k0:#c9ced8; /* 발령 개월차 1→6 (밝음→진함) */
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --v1:#5b86c8;--v2:#c97d45;--v3:#1f9a89;--v4:#8a78cf;--v5:#a98a26;--v6:#c86a82;--v0:#5d6779;
+  --k1:#2f5894;--k2:#3e6cab;--k3:#5282c2;--k4:#6d9ad5;--k5:#8fb3e3;--k6:#b5cdef;--k0:#3a4357;
+}}
+:root{
+  --c-HY:var(--v1);  /* 현장교육 */
+  --c-RD:var(--v2);  /* 부서라운딩 */
+  --c-N1:var(--v1);--c-N2:var(--v3);--c-RN:var(--v4);--c-MV:var(--v2); /* 신규간호사 Ⅰ·Ⅱ·간호사·부서이동자 */
+  --c-NEW:var(--v1);--c-ETC:var(--v3);
+  --c-K1:var(--v1);--c-K2:var(--v2);--c-K3:var(--v3);--c-K4:var(--v4); /* 발령 차수 비교 */
+  --c-B1:var(--v3);--c-B2:var(--v1);--c-B3:var(--v6); /* 사업 */
+  --c-G1:var(--v1);--c-G2:var(--v3);--c-G3:var(--v4);--c-G4:var(--v6);--c-G5:var(--v5);--c-G6:var(--v2);--c-G0:var(--v0); /* 부서군 */
+  --c-P1:var(--v1);--c-P2:var(--v3);--c-P3:var(--v4);--c-P4:var(--v6);--c-P5:var(--v5);--c-P6:var(--v2); /* 교육간호사 배치구분 */
 }
 /* 이 대시보드에서 추가로 쓰는 작은 부품 (디자인 시스템 규칙 안에서) */
 .chart-wrap{width:100%}
@@ -50,7 +57,6 @@
 .nm-s{display:none}
 tr.sub th,tr.sub td{font-weight:700;border-top:1px solid var(--line2)}
 tr.grp th{background:var(--sunk);color:var(--ink2);font-size:12px}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--k1:#16325c;--k2:#1c4a85;--k3:#2a64b0;--k4:#3f82d6;--k5:#6da7ec;--k6:#a9cbf5;--k0:#3a4357}}
 @media (max-width:1100px){.bizcards{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:820px){.nm-f{display:none}.nm-s{display:inline}}
 </style>
@@ -128,7 +134,7 @@ const COHORTS = [...new Set(nurseAll.map(x=>cohortOf(x[5])))].sort();
 /* 부서군(신규간호사 발령 유지관리 시스템 발령현황 기준) */
 const UNIT_GROUPS=[['일반병동',['12A','12B','11B','10A','10B','8A','8B','7B','6A']],['통합병동',['14A','14B','13A','13B','11A','9A','9B','7A']],['중환자',['MICU','SICU','EICU','NICU','MFICU']],['수술회복',['수술실','회복실']],['응급',['응급실']]];
 const GROUP_OF={}; UNIT_GROUPS.forEach(([g,us])=>us.forEach(u=>GROUP_OF[u]=g));
-const GROUP_C={'일반병동':'--c-REG','통합병동':'--c-DED','중환자':'--c-PTL','수술회복':'--c-MOV','응급':'--c-SEN','기타':'--c-SPC','명단 외':'--c-TOP'};
+const GROUP_C={'일반병동':'--c-G1','통합병동':'--c-G2','중환자':'--c-G3','수술회복':'--c-G4','응급':'--c-G5','기타':'--c-G6','명단 외':'--c-G0'};
 const GROUP_ORDER=UNIT_GROUPS.map(g=>g[0]).concat(['기타','명단 외']);
 const DEPT_ALIAS={'OR':'수술실','ER':'응급실','RCR':'회복실'};
 const deptName=d=>DEPT_ALIAS[d]||d;
@@ -358,7 +364,7 @@ function p1(main){
   // 배치구분별 신규간호사(Ⅰ+Ⅱ) 1인당 월평균
   const nn=recs.filter(x=>{const s=stage(x);return s==='N1'||s==='N2';});
   const pmap={}; nn.forEach(x=>{const pl=placeOf(x[0],x[1]); const o=(pmap[pl]=pmap[pl]||{min:0,by:{},ppl:{}}); o.min+=x[4]; o.by[x[0]]=(o.by[x[0]]||0)+x[4]; (o.ppl[x[0]]=o.ppl[x[0]]||new Set()).add(pk(x));});
-  const PL=PLACES.filter(([n])=>pmap[n]).concat(pmap['기타']?[['기타','--c-TOP']]:[]);
+  const PL=PLACES.filter(([n])=>pmap[n]).concat(pmap['기타']?[['기타','--v0']]:[]);
   const pm=(o,m)=>o.ppl[m]?o.by[m]/o.ppl[m].size:null;
   const pAvg=o=>{const pmo=Object.values(o.ppl).reduce((a,s)=>a+s.size,0);return pmo?o.min/pmo:0;};
   const allPm=(()=>{const per={};nn.forEach(x=>{(per[x[0]]=per[x[0]]||new Set()).add(pk(x));});const pmo=Object.values(per).reduce((a,s)=>a+s.size,0);return pmo?nn.reduce((a,x)=>a+x[4],0)/pmo:0;})();
