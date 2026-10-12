@@ -1070,7 +1070,6 @@ function p5(main){
     <div class="rules">${RULES.map(r=>{ const c=chg(r.b); return `<div class="rule"><div class="rh"><b>${esc(BIZ_SHORT[r.b]==='통합'?'간호간병':BIZ_SHORT[r.b]==='교대제'?'교대제 개선':'필수의료')}</b><span class="due${r.ok?'':' unk'}">${esc(r.due)}</span></div>
       ${c.length?`<div class="rnow">${ml(m)} 변동 ${c.length}건 · ${r.b.indexOf('교대제')>=0?`${nextM(m)} 5일까지 신고`:r.ok?'변경일로부터 7일 이내 신고':'위탁기관 확인'}</div>`:''}
       <dl>${r.items.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl><p class="note" style="margin:8px 0 0">${esc(r.src)}</p></div>`; }).join('')}</div></section>
-  ${certSection(m)}
   <div class="card tools" style="padding:14px 20px"><div class="seg"><span class="gl">기준월</span>${BMS.map(mm=>`<button class="chip" data-bm="${mm}" aria-pressed="${mm===m}">${ml(mm)}</button>`).join('')}</div></div>
   <section class="card" id="bizin"></section>
   <div class="kpis">
@@ -1093,7 +1092,8 @@ function p5(main){
   </div>
   <section class="card">${tools('인력별 월간 신고 현황','칸 색 = 신고 사업, 굵은 글씨 = 교육전담 역할, <span class="chg">파란 글씨</span> = 직전 달과 달라진 달, <span class="st rsg">빨간 배지</span> = 중복 신고','t8')}
     <div class="legend" style="margin-top:8px">${BIZ.map(b=>`<span><i style="background:color-mix(in srgb,var(${BIZ_C[b]}) 35%,transparent);border:1px solid var(${BIZ_C[b]})"></i>${BIZ_SHORT[b]} · ${esc(b)}</span>`).join('')}</div>
-    <div class="tw" style="margin-top:10px"><table id="t8"></table></div></section>`);
+    <div class="tw" style="margin-top:10px"><table id="t8"></table></div></section>
+  ${certSection(m)}`);
   document.querySelectorAll('[data-bm]').forEach(b=>b.onclick=()=>{S.bizMonth=b.dataset.bm;render();});
   bizForm(BMS);
   const people=[...new Set(D.biz.map(x=>x[3]))];
