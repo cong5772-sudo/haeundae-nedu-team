@@ -1380,12 +1380,12 @@ async function call(body){
   throw last.auth ? last : new Error('서버에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
 }
 function showLogin(msg, which){ $('loading').hidden=true; $('login').hidden=false; document.body.classList.add('locked'); if(msg) $(which||'lgerr').textContent=msg; initGoogle(); }
-async function load(cred, fresh){
+async function load(c0, fresh){   // c0 = 이번 로그인 정보(아래 cred() 함수와 이름이 겹치지 않게)
   $('loading').hidden=false;
-  const j = await call(Object.assign({action:'data',fresh:!!fresh},cred));
+  const j = await call(Object.assign({action:'data',fresh:!!fresh},c0));
   $('login').hidden=true; $('loading').hidden=true; document.body.classList.remove('locked');
   if (booted){ location.reload(); return; }
-  booted = true; window.opsCall = b => call(Object.assign({}, b, cred())); window.bootApp(j.data, j.who, {team: !!j.team, admin: !!j.admin, deny: j.deny||[]});
+  booted = true; window.opsCall = b => call(Object.assign({}, b, cred()||c0)); window.bootApp(j.data, j.who, {team: !!j.team, admin: !!j.admin, deny: j.deny||[]});
 }
 function cred(){ const t=store.get('ops_token'), g=store.get('ops_id'); return t?{token:t}:g?{idToken:g}:null; }
 window.opsReload = async ()=>{ const c=cred(); if(!c){ location.reload(); return; } try{ $('loading').hidden=false; const j=await call(Object.assign({action:'data',fresh:true},c)); store.set('ops_cache_ok','1'); location.reload(); }catch(e){ $('loading').hidden=true; alert(e.message); } };
