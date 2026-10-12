@@ -993,6 +993,40 @@ function bizForm(BMS){
   if($('bfnew')) $('bfnew').onclick=()=>{ const to=nextOf(last); if(!confirm(`${ml(last)} 신고 인력을 그대로 복사해 ${ml(to)} 신고를 시작할까요?`)) return; S.bizMonth=to; save({action:'bizSave',month:to,copyFrom:last,ops:[]}); };
 }
 
+/* 교육전담간호사 양성교육 이수 관리 (사업신고 페이지) */
+const CERT_RULES=[
+  {k:'고시', t:'교육전담간호사 양성교육 유효기간', d:'이수일로부터 <b>3년이 되는 해의 12월 31일</b>까지(재이수도 동일). 교육기관·교육내용(①역할 ②교육과정 기획·운영·평가 ③기타)·<b>8시간 이상</b>을 모두 충족해야 인정(대한간호협회 기본·심화과정 등). 시뮬레이션 교육자 과정 등은 불인정', s:'보건복지부 고시 제2025-149호 「교육전담간호사 양성교육에 관한 고시」(2025.9.1. 시행) 제6조'},
+  {k:'간호간병', t:'간호·간병통합서비스 교육전담간호사', d:'고시 유효기간 적용. 만료 후 재이수하지 않거나, 만료 전 재이수했더라도 <b>공단에 이수증을 내지 않으면</b> 그 기간 월 단위 인센티브 지급 제한', s:'건보공단 「교육전담간호사 지원사업 세부운영기준」(2026.2.9.) 참고5·Ⅲ.1.라'},
+  {k:'교대제', t:'간호사 교대제 개선 시범사업', d:'고시 유효기간 적용. 교육전담간호사팀 <b>첫 배치일 이전</b>에 이수, 유효기간 만료 전 재이수. 교육이수증은 근무 월 다음 달 11~15일 구성현황(별지 12호)과 함께 증빙', s:'보건복지부 「제2차 간호사 교대제 개선 시범사업 지침」(2026.6.) 자격사항·Q3-10'},
+  {k:'필수의료', t:'필수의료 간호사 양성지원 사업', d:'<b>2년 내 필수교육 이수</b>(2026년 사업: ’24.1.1.~’26.2분기 내 이수). 교체 인력은 배치 전 이수. 변동보고·교부신청 때 필수교육 이수증 제출', s:'대한병원협회 「2026년 필수의료 간호사 양성지원 사업 지원금 관리지침」 2. 지원요건'}
+];
+const certExp=d=>d?(+d.slice(0,4)+3)+'-12-31':'';
+function certSection(m){
+  const C=(D.cert||[]).filter(c=>c[0]);
+  if(!C.length) return '';
+  const today=new Date(), ymd=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+  const days=d=>Math.round((new Date(d+'T00:00:00')-new Date(ymd+'T00:00:00'))/864e5);
+  const bizOf=n=>D.biz.filter(x=>x[0]===m&&x[3]===n&&x[6]==='신고').map(x=>x[1]);
+  const Y=+m.slice(0,4);
+  const rows=C.map(c=>{ const [n,course,d,sub,note]=c, exp=certExp(d), left=exp?days(exp):null, bz=bizOf(n);
+    const st=!d?['미등록','rsg']:left<0?['만료','rsg']:left<=183?['6개월 내 만료','rsg']:left<=365?['1년 내 만료','add']:['유효',''];
+    const judge=bz.map(b=>{ if(/필수의료/.test(b)){ const ok=d>=(Y-2)+'-01-01', nx=d>=(Y-1)+'-01-01'; return `<div><span class="kc" style="--cc:var(${BIZ_C[b]})"><i></i>필수의료</span> ${ok?'충족':'<b style="color:var(--crit-ink,#b42318)">미충족</b>'}${ok&&!nx?` <span class="note">· ${Y+1}년 사업 계속 시 ${Y}년 안에 재이수 필요(예상)</span>`:''}</div>`; }
+      return `<div><span class="kc" style="--cc:var(${BIZ_C[b]})"><i></i>${BIZ_SHORT[b]==='통합'?'간호간병':'교대제'}</span> ${left!=null&&left>=0?'충족':'<b style="color:var(--crit-ink,#b42318)">미충족</b>'}${/간호간병/.test(b)&&left!=null&&left<=365?' <span class="note">· 재이수 후 공단에 이수증 제출</span>':''}</div>`; }).join('')||'<span class="note">신고 사업 없음</span>';
+    return {n,course,d,exp,left,st,judge,sub,note,bz}; });
+  rows.sort((a,b)=>(a.left==null?-1e9:a.left)-(b.left==null?-1e9:b.left));
+  const cntSt=k=>rows.filter(r=>r.st[0]===k).length;
+  const soon=rows.filter(r=>r.left!=null&&r.left>=0&&r.left<=365);
+  const fmtD=d=>d?d.replace(/-/g,'.'):'–';
+  return `<section class="card">${tools('교육전담간호사 양성교육 이수 관리',`이수증 기준 · 유효기간 짧은 순 · 판정은 ${ml(m)} 신고 사업 기준 · 오늘 ${fmtD(ymd)}`,'tcert')}
+    <div class="rules" style="margin-top:10px">${CERT_RULES.map(r=>`<div class="rule"><div class="rh"><b>${esc(r.k)}</b></div><p style="margin:6px 0 0;font-weight:600">${esc(r.t)}</p><p class="note" style="margin:6px 0 0;color:var(--ink2);line-height:1.6">${r.d}</p><p class="note" style="margin:8px 0 0">근거: ${esc(r.s)}</p></div>`).join('')}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      <span class="st">전체 ${rows.length}명</span><span class="st">유효 ${cntSt('유효')}명</span><span class="st add">1년 내 만료 ${cntSt('1년 내 만료')}명</span><span class="st rsg">6개월 내 만료 ${cntSt('6개월 내 만료')}명</span>${cntSt('만료')?`<span class="st rsg">만료 ${cntSt('만료')}명</span>`:''}</div>
+    ${soon.length?`<div class="callout" style="margin-top:10px">갱신 필요: ${soon.map(r=>`<b>${esc(r.n)}</b>(${fmtD(r.exp)}까지)`).join(', ')} — 만료일 전에 양성교육(기본·심화)을 다시 이수하고, 간호간병 신고 인력은 공단에 이수증을 제출하세요.</div>`:''}
+    <div class="tw" style="margin-top:10px"><table id="tcert"><thead><tr><th>성명</th><th>과정</th><th>이수일</th><th>유효기간(고시)</th><th>남은 기간</th><th>상태</th><th style="text-align:left;min-width:220px">${ml(m)} 신고 사업 기준</th><th style="text-align:left">비고</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr><th>${esc(r.n)}</th><td style="text-align:center">${esc(r.course||'–')}</td><td class="num">${fmtD(r.d)}</td><td class="num">${fmtD(r.exp)}</td><td class="num">${r.left==null?'–':r.left<0?'만료':Math.floor(r.left/30)+'개월'}</td><td style="text-align:center">${r.st[0]==='유효'?'<span class="note">유효</span>':`<span class="st ${r.st[1]}">${r.st[0]}</span>`}</td><td style="text-align:left;white-space:normal">${r.judge}</td><td style="text-align:left;white-space:normal" class="note">${esc([r.sub?'이수증 제출: '+r.sub:'',r.note].filter(Boolean).join(' · '))}</td></tr>`).join('')}</tbody></table></div>
+    <p class="note" style="margin:10px 0 0">이수일·과정은 시트 [교육전담 양성교육 이수] 탭에서 고치면 새로고침 후 반영돼요. 필수의료 '필수교육'은 관리지침의 2년 기준으로 판정했고, ${Y+1}년 기준은 새 지침이 나오면 다시 확인하세요.</p></section>`;
+}
+
 function p5(main){
   const BMS=[...new Set(D.biz.map(b=>b[0]))].sort();
   if(!BMS.includes(S.bizMonth)) S.bizMonth=BMS[BMS.length-1];
@@ -1010,20 +1044,21 @@ function p5(main){
       ['지연','<b>14일 이상 늦으면</b> 변경 요청 공문(지연 사유) + 변경일 증빙(근무표) 추가 제출'],
       ['주의','휴가·병가 등 <b>15일 이상 연속 미근무</b>(주말·공휴일 포함), 1일 8시간·주 40시간 미준수, 통합병동 교육 외 업무 시 인센티브 제한'],
       ['중복','간호관리료 차등제·통합병동 인력 산정 포함 또는 다른 사업과 중복 배치 금지'],
+      ['자격','병원급 근무 3년 이상(통합병동 1년) + 양성교육 유효기간 내(이수일로부터 3년이 되는 해 12.31.). 만료 전 재이수 후 <b>이수증을 공단에 제출</b>해야 함(미제출 기간 인센티브 제한)'],
       ['자료','분기 교육운영 자료: 해당 분기 다음 달 1~15일 제출']]},
     {b:'간호사 교대제 개선 시범사업', src:'보건복지부 「제2차 간호사 교대제 개선 시범사업 지침」', ok:true, due:'근무 월 다음 달 5일까지', items:[
       ['신고','인력 현황 변경: <b>근무 월 다음 달 5일까지</b> 보건의료자원통합신고포털(현황신고·변경 > 인력현황), \'교육전담간호사팀\'으로 신고'],
       ['서류','교육전담부서 구성현황(별지 12호): 근무 월 다음 달 11~15일 시범사업자료제출시스템'],
       ['대체','퇴사·이동·병가 등 부재 시 <b>15일 이내 대체 배치</b>. 16일 이상 연속 부재 시 지원금 제한(16~30일은 부재 기간만 미지급)'],
       ['중복','간호등급 인력 산정 제외. 간호간병 교육전담 등 유사 사업과 중복 불가(확인 시 환수). 타 사업 인력과 구분해 신고'],
-      ['자격','경력 3년 이상 + 최근 2년 이내 교육전담간호사 양성교육(기본과정) 이수, 주 40시간'],
+      ['자격','경력 3년 이상 + 「교육전담간호사 양성교육에 관한 고시」 양성교육 유효기간 내(이수일로부터 3년이 되는 해 12.31.). 첫 배치일 이전 이수, 만료 전 재이수 · 주 40시간'],
       ['감산','반기 중간에 바뀐 인력은 첫 배치일 기준으로 경력 요건 산정']]},
     {b:'필수의료간호사 양성지원사업', src:'대한병원협회 「2026년 필수의료 간호사 양성지원 사업 지원금 관리지침」', ok:true, due:'변동일로부터 14일 이내', items:[
       ['신고','이직·타부서 발령 등으로 인원이 줄거나 교체하면 <b>변동일로부터 14일 이내</b> 변동보고(공문 필수, 이메일+등기우편)'],
       ['서류','변동보고서(별지 5호), 인사변동 근거서류, 배치·자격 서류(임상경력·필수교육 이수증), 구성현황(별지 2호)'],
       ['반납','인원이 줄면 변동일 기준 반납액을 병원협회와 사전 확인 후 <b>14일 이내 반납</b>(지원금은 근무일수 일할 계산)'],
       ['대체','병가 등으로 <b>16일 이상</b>(주말 포함) 공백이면 변동보고 + 대체인력 배치. 미배치 시 지원금 반납'],
-      ['자격','필수의료병동 합산 임상 2년 이상(일반병동 3년) + 2년 내 필수교육 이수. 교체 인력은 <b>배치 전</b> 필수교육 이수'],
+      ['자격','필수의료병동 합산 임상 2년 이상(일반병동 3년) + 2년 내 필수교육 이수(’24.1.1.~’26.2분기 내 이수 완료). 교체 인력은 <b>배치 전</b> 필수교육 이수'],
       ['추가','인력 추가 배치 시 지원요건 충족일로부터 10일 이내 교부 신청'],
       ['자료','분기별 보고(재직증명서·업무실적·교육대상자 현황·전용계좌 내역), 정산 12.22~12.30']]}
   ];
@@ -1035,6 +1070,7 @@ function p5(main){
     <div class="rules">${RULES.map(r=>{ const c=chg(r.b); return `<div class="rule"><div class="rh"><b>${esc(BIZ_SHORT[r.b]==='통합'?'간호간병':BIZ_SHORT[r.b]==='교대제'?'교대제 개선':'필수의료')}</b><span class="due${r.ok?'':' unk'}">${esc(r.due)}</span></div>
       ${c.length?`<div class="rnow">${ml(m)} 변동 ${c.length}건 · ${r.b.indexOf('교대제')>=0?`${nextM(m)} 5일까지 신고`:r.ok?'변경일로부터 7일 이내 신고':'위탁기관 확인'}</div>`:''}
       <dl>${r.items.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl><p class="note" style="margin:8px 0 0">${esc(r.src)}</p></div>`; }).join('')}</div></section>
+  ${certSection(m)}
   <div class="card tools" style="padding:14px 20px"><div class="seg"><span class="gl">기준월</span>${BMS.map(mm=>`<button class="chip" data-bm="${mm}" aria-pressed="${mm===m}">${ml(mm)}</button>`).join('')}</div></div>
   <section class="card" id="bizin"></section>
   <div class="kpis">
