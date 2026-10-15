@@ -290,7 +290,8 @@ const PAGES = [
   {id:'p8', ic:'✎', name:'기타업무 성과', period:true, desc:'월별 업무보고의 기타업무 중 본인이 개발·제작·기획·검수한 성과만 모았습니다. 회의·참석·참관·준비 같은 일상 업무와 휴가는 빠져 있고, 여러 날 적힌 같은 일은 1건(투입 일수)으로 셉니다.'}, */
   {id:'p5', ic:'✓', name:'사업신고 인력 관리', period:false, desc:'사업별 신고 인원(매월 기준 9명)과 변동 내역입니다. 사업운영기준에 따른 변동 보고 확인용입니다.'},
   {id:'p7', ic:'⚿', name:'간호교육팀 이력', period:false, desc:'간호교육팀 인력 이력(개인정보)입니다. 2차 비밀번호를 넣어야 열리고, 인력 변경 시 간호관리실(재단) 송부용으로 엑셀·PDF로 받을 수 있어요.'},
-  {id:'p6', ic:'⇪', name:'업무보고 올리기', period:false, desc:'업무보고 파일을 여기에 올리면 구글 드라이브 지정 폴더에 저장되고, 1시간 안에 구글시트로 자동 정리돼요.'}
+  {id:'p6', ic:'⇪', name:'업무보고 올리기', period:false, desc:'업무보고 파일을 여기에 올리면 구글 드라이브 지정 폴더에 저장되고, 1시간 안에 구글시트로 자동 정리돼요.'},
+  {id:'p9', ic:'▣', name:'교육일정 관리', period:false, desc:'교육일정 포스터를 올리면 AI가 일정을 읽어 줍니다. 확인·수정해 저장하고, 월별 달력·목록으로 관리하며 원내교육실시현황·실제 실시 기록과 대조합니다. 간호교육팀 교육참석 대시보드와 같은 자료를 함께 사용해요.'}
 ];
 
 /* ---------- 상태 ---------- */
@@ -318,7 +319,7 @@ function applyFilter(){
 document.getElementById('asof').textContent = D.updated;
 document.getElementById('reload').onclick = ()=>window.opsReload();
 const nav = document.getElementById('nav');
-const SHORT={p1:'월별',p2:'교육간호사',p3:'부서별',p4:'담당부서',p8:'기타업무',p5:'사업신고',p7:'교육팀이력',p6:'올리기'};
+const SHORT={p1:'월별',p2:'교육간호사',p3:'부서별',p4:'담당부서',p8:'기타업무',p5:'사업신고',p7:'교육팀이력',p6:'올리기',p9:'교육일정'};
 nav.innerHTML = PAGES.map(p=>`<button class="navbtn${DENY.has(p.id)?' lk':''}" data-p="${p.id}"${DENY.has(p.id)?' aria-disabled="true" title="이 계정은 접근이 제한된 페이지예요"':''}><span class="ic">${p.ic}</span><span class="nm-f">${p.name}</span><span class="nm-s">${SHORT[p.id]}</span>${DENY.has(p.id)?'<span class="lkic" aria-hidden="true">🔒</span>':''}</button>`).join('');
 if(innerWidth<=820) document.querySelector('.fcard').removeAttribute('open');
 nav.onclick = e => { const b=e.target.closest('[data-p]'); if(!b) return; if(DENY.has(b.dataset.p)){ alert('이 계정은 이 페이지에 접근할 수 없어요. 필요하면 교육파트장에게 요청하세요.'); return; } location.hash=b.dataset.p; };
@@ -1258,6 +1259,20 @@ function upWarn(it){
   if(it.file.size>20*1024*1024) w.push(['bad','20MB 이하만 올릴 수 있어요']);
   return w;
 }
+/* ---------- 교육일정 관리 (간호교육 참석현황 대시보드와 같은 화면 모듈 schedule.js 를 불러와 사용) ---------- */
+const SCHED_EDU = {sessions:[], names:{}, done:false};
+function p9(main){
+  if(!window.opsCall){ main.insertAdjacentHTML('beforeend','<div class="callout">PC 미리보기(사본 데이터)에서는 쓸 수 없어요. 배포된 대시보드에 로그인해서 사용하세요.</div>'); return; }
+  if(!opt.team){ main.insertAdjacentHTML('beforeend','<div class="callout">교육일정 관리는 간호교육팀만 할 수 있어요. 「명단열람 허용」 탭 소속에 간호교육팀이 있어야 해요.</div>'); return; }
+  main.insertAdjacentHTML('beforeend','<div id="sched-root"><div class="callout">교육일정을 불러오는 중…</div></div>');
+  const box=document.getElementById('sched-root');
+  const fail=m=>{ box.innerHTML='<div class="callout warn">'+esc(m)+'</div>'; };
+  if(!window.EDU_SCHED_JS){ fail('config.js 에 EDU_SCHED_JS(교육일정 모듈 주소)가 설정되지 않았어요.'); return; }
+  const mod = window.EduSchedule ? Promise.resolve() : new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=window.EDU_SCHED_JS; s.onload=res; s.onerror=()=>rej(new Error('교육일정 화면 모듈을 불러오지 못했어요. 잠시 뒤 새로고침해 주세요.')); document.head.appendChild(s); });
+  const act = (SCHED_EDU.done||!window.EDU_DATA_API) ? Promise.resolve() : fetch(window.EDU_DATA_API+(String(window.EDU_DATA_API).includes('?')?'&':'?')+'action=data&t='+Date.now(),{cache:'no-store'}).then(r=>r.json()).then(j=>{ SCHED_EDU.sessions=j.sessions||[]; SCHED_EDU.names=Object.assign({},j.keys,j.keysx); SCHED_EDU.done=true; }).catch(()=>{ SCHED_EDU.done=true; });   // 실제 실시 기록을 못 받아도 일정 관리는 계속 사용 가능
+  Promise.all([mod,act]).then(()=>{ const el=document.getElementById('sched-root'); if(el) EduSchedule.mount(el,{call:b=>window.opsCall(b), sessions:()=>SCHED_EDU.sessions, names:()=>SCHED_EDU.names}); }).catch(e=>fail(e.message||e));
+}
+
 function p6(main){
   const can = !!window.opsCall && opt.team;
   if(!UP.month) UP.month=DEF_MONTH;
@@ -1351,7 +1366,7 @@ function render(){
   const lj=document.getElementById('ljh'); if(lj) lj.onclick=e=>{ const b=e.target.closest('[data-v]'); if(!b) return; S.ljh=b.dataset.v==='1'; render(); };
   if(S.page==='p3') main.insertAdjacentHTML('beforeend','<div class="callout">PAM(전담간호사) 교육내용은 제외되어 있음</div>');
   if(page.period&&!selMonths().length){ main.insertAdjacentHTML('beforeend',`<div class="card"><p class="note">선택한 기간(${esc(CAL.filter(m=>S.months.has(m)).map(ml).join(', '))})에는 아직 보고 자료가 없어요. 자료가 있는 기간은 ${esc(ml(MONTHS[0]))}~${esc(ml(MONTHS[MONTHS.length-1]))}입니다.</p></div>`); }
-  else ({p1,p2,p3,p4,p5,p6,p7,p8})[S.page](main);
+  else ({p1,p2,p3,p4,p5,p6,p7,p8,p9})[S.page](main);
   document.title=page.name+' · 간호교육팀 운영 대시보드';
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);
